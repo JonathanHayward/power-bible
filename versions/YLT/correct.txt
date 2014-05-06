@@ -1,0 +1,229 @@
+²²²±±±°°°     Young's Literal Translation    °°°±±±²²²
+²                  of the Holy Bible                 ²
+±                                                    ±
+±          by Robert Young, 1862,1887,1898           ±
+°   (author of the Young's Analytical Concordance)   °
+°                                                    °
+±    Printed copy available from Baker Publishing    ±
+±               Grand Rapids, Mi. 49516              ±
+²                                                    ²
+²²²±±±°°°    Public Domain ùù Copy Freely    °°°±±±²²²
+
+
+        This text was was keyed from the photo-offset edition
+printed by Baker Books.  Thanks to Earl Melton and Sandi Cooley
+for much data entry work.  The NT has been proof-read twice, and
+the OT once.
+
+        The most current/corrected copy can be obtained via modem on:
+                Bible Foundation BBS,
+                602-789-7040 (300-14.4)
+
+        Or by mail from:
+                Mark Fuller
+                1129 East Loyola Drive
+                Tempe, Az.  85282
+
+
+##### Problems not changed ################################
+GE 37:36  (the word Medanites looks unusual compared to v.28, but different
+          Hebrew words are used and the one at v36 admits the spelling
+          -- not changed.)
+EX 1:11   contains Raamses, unlike Rameses in 12:37.  (Not changed due to
+          this spelling justified by 2 different Hebrew words.)
+JER 15:7  'in the gates the land' may be a typo.  It may need 'of' the land.
+          (Not changed)
+AM 2:4    word 'reserve' could be a typo for 'reverse'.
+MT 22:19  tribute-coin?' -- question mark is unusual. (not changed)
+MT 24:48  Lord -- capitalized but not in vs.45,46 (not changed)
+MT 27:11  'Art thou the king of the Jews!' -- a question mark appears to be
+          more appropriate.  (not changed)
+JOH 4:35  'do not' could be 'do ye not' as interlinear. (not changed)
+JOH 8:36  'son' not capitalized (not changed)
+AC 12:11  'did sent' (may be 'did send'.  Not changed)
+AC 17:9   'having taking' (may be 'having taken'. Not changed)
+AC 22:25  a question mark would be more appropriate at end of verse.
+RO 4:22   'him to' appears, through proportianal spacing, to be missing
+          punctuation. (Not Changed)
+
+
+###### Problems changed ####################################
+GE 50:17  their speaking unto them > their speaking unto him
+          (the word 'them' seems to be a typo in the printed copy based on
+          context and other xlations.)
+EX 3:22   Egyptians. > Egyptians.'
+EX 4:12   speakest; > speakest;'
+EX 14:15  me > Me (as My in 14:18)
+EX 16:28  my > My (as first My in same verse)
+NU 18:32  of of > of
+DE 28:43  [is] thy midst > [is] in thy midst
+JOS 10:36 against it > against it, (as previous few verses)
+JOS 12:4  dwell- > dwelling
+JOS 19:50 hill country > hill-country (as numerous others)
+JOS 21:36-37 is bracketed -- no apparent reason, brackets removed.
+JU 5:4    dropped > dropped,
+JU 5:6    ways > ways.
+JU 8:21   Zeba > Zebah
+JU 9:3    brother; > brother;'
+JU 17:3   silverings > silverlings (as in the same passage numerous times)
+JU 19:16  and > (and   (the verse ends with a close-paren)
+JU 19:27  threshhold > threshold
+1SA 2:8   poor > poor,
+2SA 10:15-19 Hadarezer > Hadadezer (three times, changed to previous occurences)
+2SA 17:10 (a word is unreadable, 'these' or 'those'.  used 'those')
+2SA 21:10 sackloth > sackcloth
+2SA 22:37 ancles > ankles
+1KI 1:32  Jehoida > Jehoiada
+2KI 15:17 of of > of
+2KI 19:23 mountains > mountains -- (some sort of puncuation was needed)
+1CH 1:32  Jokshan; > Jokshan:
+1CH 1:42  Dishan; > Dishan:
+1CH 4:25  Mibsam, > Mibsam
+1CH 4:28  Beer-sheba > Beer-Sheba
+2CH 7:20  byeword > byword
+EZR 4:8   Shimai > Shimshai (as other occurences in this chapter)
+NE 9:34   thy > Thy (as numerous in this passage)
+JOB 33:19 He > he (does not refer to diety)
+PS 116:18 led > let (as v.14)
+PS 144:10 sword evil > sword of evil (a large blank spot is in the text
+          indicating a missing word.)
+JER 36:14 Jedhudi > Jehudi
+JER 39:11 chief the > chief of the (as v.10,13)
+JER 51:16 forth > forth,  (the comma is absent, but appears to be needed)
+LA 2:2    His > His wrath (the word is missing, and Darby&AV use 'wrath')
+EZE 10:18 off > of
+EZE 31:2  greatness > greatness? (proportional spacing indicates missing punc.)
+HO 10:2   standing-pillars > standing pillars (as v.1.)
+AM 2:2    (print bad, could be 'of trumpet' or 'of a trumpet'.
+          I used 'of a trumpet'.)
+MIC 6:5   Shitim > Shittim
+MT 10:9   no scrip > nor scrip
+MT 12:17  fulfiled > fulfilled
+MT 13:8   hundred-fold > hundredfold (as in vs.23; 19:29)
+MT 15:14  fall. > fall.'
+MT 17:24  'Yes. > 'Yes.'
+MT 18:13  ninety nine > ninety-nine (as in vs.12)
+MT 18:18  heaven > heavens (as others in this passage)
+MT 21:38  inheritance > inheritance;  (proportional spacing indicate punctuation.)
+MR 1:44   them. > them.' (added close qoute)
+MR 2:25   'And > And (removed first qoute as spurious)
+MR 6:2    done?' > done? (end qoute removed, use existing end qoute in vs.3)
+MR 8:24   said, I > said, 'I
+MR 8:31   again;' > again; (not qoutable speech)
+MR 8:33   adversary > Adversary  (as elsewhere)
+MR 9:28   forth.' > forth?'
+MR 15:28  writing > Writing (as elsewhere).
+LU 2:5    enrol > enroll
+LU 2:29   thy > Thy
+LU 8:46   me ' > me.'
+LU 14:9   Removed quotation mark at beginning of sub quote.
+LU 14:32  ambassy > embassy  (as 19:14)
+LU 21:14  before hand > beforehand
+JOH 1:29  lamb > Lamb  (as 1:36
+JOH 9:16  bad type missing open-qoute and 'a' before man.  (changed)
+JOH 9:26  thee?' > thee?  (in favor of close qoute at end of verse)
+JOH 16:7,13,14 capitalized personal pronouns referring to the Holy Spirit
+          as vs. 8.
+JOH 17:23 thou > Thou   (as first occurence in verse)
+JOH 18:31 `Pilate > Pilate
+AC 5:37   enrolment > enrollment
+RO 9:23   he > He (to match following 'Him')
+1CO 1:27  that he may > that He may (as other occurances)
+1CO 3:22  be  all > be -- all (proportional spacing indicates missing
+          puncuation.)
+1CO 7:18  being uncircumcised > being circumcised (compare to AV.)
+2CO 12:6  forbear > forebear
+2CO 12:3  have have > have
+COL 1:11  his > His (as others).
+1TH 3:11  himself > Himself (as others, v.13)
+2TI 4:2   long suffering > long-suffering (as it is in 3:10) and elsewhere.
+HEB 2:17  chief-priest > chief priest (as appears in 3:1 etc.)
+HEB 3:15  his > His   (as the same quote in vs. 7.)
+HEB 11:8  whether > whither
+HEB 12:28 well pleasingly > well-pleasingly (as 13:16,21).
+JAS 2:14  `faith > faith, (it is not a qoute, and a space is present for
+          puncuation.)
+RE 4:5    seven spirits > Seven Spirits (as previous usage)
+RE 5:6    seven Spirits > Seven Spirits (as previous usage)
+
+
+##### Word spelling standardization #################################
+
+all-devouring Ps 52:4
+         removed hyphen.
+Bathsheba 1ki 1:28
+         changed to 'Bath-Sheba' as all other occurences.
+birth-day Mr 6:21, Mt 14:6
+         changed to 'birthday' as one other occurence.
+bride-groom Mt 9:15
+         changed to 'bridegroom' as 24 other occurences.
+byeword  1ki 9:7, De 28:37, 2ch 7:20
+         changed to 'byword' as Job 30:9, Jer 24:9
+clear-heat Isa
+         removed hyphen
+Esarhaddon 1ki:19:37
+         changed to 'Esar-Haddon' as Isa 37:38
+Eshbaal 1ch 9:39
+         changed to 'Esh-Baal' as 1ch 8:33
+firepans Jer 52:19
+         changed to 'fire-pans' as 3 others.
+foot-men 1ch 19:18
+         changed to 'footmen' as others.
+fore-know(ledge) 1pe 1:2; 1:20
+         changed to 'foreknow(ledge)' as Ac 2:23 and Ro 8:29.
+fore-ordained Eph 1:5, Eph 1:11
+         changed to 'foreordained' as 1co 2:7.
+four-fold Lu 19:8
+         changed to 'fourfold' as 2sa 12:6.
+gate-keeper(s) 2sa 18:26, Ezr 7:7, 1ch 26:1; 26:12, 2ki 7:10; 7:11
+         changed to gatekeeper(s) as 31 other occurences.
+goodwill 2ch 15:15
+         changed to good-will as 7 other occurences.
+hail-stone(s) Jos 10:11, Eze 38:22
+         changed to 'hailstone(s)' as 3 others.
+hand-maid Ge 31:33, De 5:14; 12:12; 12:18; 16:11; 16:14, Job 31:13
+         changed to 'handmaid' as 40 others.
+honey-comb Lu 24:42
+         changed to 'honeycomb' as 4 others.
+hundred-fold Ge 26:12, Mr 10:30
+         changed to 'hundredfold' as 3 others.
+I-chabod 1Sa 4:21
+         changed to 'I-Chabod' as 1sa 14:3.
+lampstand Lu 8:16, 11:33
+         changed to 'lamp-stand' as 10 others.
+lap-wing Le 11:19
+         changed to 'lapwing' as De 14:18
+law-giv(er)(ing) Ps 60:7; 108:8, Ro 9:4
+         changed to 'lawgiv(er)(ing)' as 7 others.
+manslayer Jos 21:21, Joh 8:44
+         changed to 'man-slayer' as 18 others.
+mill-stone(s) De 24:6, Nu 11:8, Ex 11:5, Mt 18:6
+         changed to 'millstone(s)' as 6 others.
+network(s) Jer 52:22, Isa 19:9
+         changed to 'net-work(s)' as 7 others.
+offering-up 2ch 35:14
+         changed to 'offering up' as others.
+out-going(s) Eze 27:33, 2pe 1:15, Ex 23:16, 1ki 10:28, Jos 15:7
+         changed to 'outgoing(s)' as 31 others.
+over-abound Ro 5:20
+         changed to 'overabound' as 2co 7:4.
+over-abundance Mt 13:12; 25:29
+         changed to 'overabundance'. (only 2 occurences)
+over-shadow(ed) Lu 1:35; 9:34, Heb 9:5
+         changed to 'overshadow(ed)' as 3 others.
+palmerworm Am 4:9
+         changed to 'palmer-worm' as Joe 1:4; 2:25
+sideposts 1ki 6:31
+         changed to 'side-posts' as 8 others.
+store-house(s)  Lu 12:18, De 28:8, Joe 1:17
+         changed to 'storehouse(s)' as 7 others.
+vinedresser(s) Jer 52:16, 2ch 26:10, 2ki 25:12
+         changed to 'vine-dresser(s)' as 3 others.
+vine-yards De 6:11
+         changed to 'vineyards' as 114 others.
+worm-wood De 29:18
+         changed to 'wormwood' as 9 others.
+wellwisher Ps 7:4
+         changed to well-wisher as 1 others.
+white-washed Ac 23:3
+         changed to 'whitewashed' as Mt 23:27

@@ -81,7 +81,7 @@ includeOldTestamentByDefault yes
 # Whether searches, by default, include the Old Testament Apocrypha. The value
 # should be "yes" or "no".
 #
-includeApocryphaByDefault no
+includeApocryphaByDefault yes
 
 #
 # Whether searches, by default, include the New Testament. The value should be
@@ -93,7 +93,7 @@ includeNewTestamentByDefault yes
 # The current version and release of the Powered Access Bible.
 #
 
-versionNumber 1.0.1R2
+versionNumber 1.0.2R1
 
 #
 # How many columns wide text-related inputs are.  You should set this value

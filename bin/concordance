@@ -19,63 +19,80 @@ $all_available_books =~ s/ +/ /g;
 sub get_proper_book_name
     {
     my $unprocessed_book_name = shift(@_);
+    my @book_name_parts = split / /, $unprocessed_book_name;
+    $first_token = shift @book_name_parts;
+    #$first_token = $unprocessed_book_name;
+    #print "#$first_token#";
+    $extra = " " . join " ", @book_name_parts;
     unless ($unprocessed_book_name =~ /[a-z]/)
         {
         return $unprocessed_book_name;
         }
     if ($unprocessed_book_name eq "additions-to-daniel")
         {
-        return "Additions to Daniel";
+        return "Additions to Daniel" . $extra;
         }
     elsif ($unprocessed_book_name eq "additions-to-esther")
         {
-        return "Additions to Esther";
+        return "Additions to Esther" . $extra;
         }
     elsif ($unprocessed_book_name eq "bel-and-the-dragon")
         {
-        return "Bel and the Dragon";
+        return "Bel and the Dragon" . $extra;
         }
     elsif ($unprocessed_book_name eq "prayer-of-manasseh")
         {
-        return "Prayer of Manasseh";
+        return "Prayer of Manasseh" . $extra;
         }
     elsif ($unprocessed_book_name eq "psalm-151")
         {
-        return "Psalm 151";
+        return "Psalm 151" . $extra;
         }
-    elsif ($unprocessed_book_name eq "song-of-songs")
+    elsif ($first_token eq "song-of-songs")
         {
-        return "Song of Songs";
+        return "Song of Songs" . $extra;
         }
     else
         {
-        my @book_name_parts = split /-/, $unprocessed_book_name;
+        my @book_name_parts = split / /, $unprocessed_book_name;
+        $first_token = shift @book_name_parts;
+        #print @book_name_parts;
+        #@book_name_parts = ((split /-/, $first_token), @book_name_parts);
+        if (scalar @book_name_parts > 0)
+            {
+            $extra = " " . join " ", @book_name_parts;
+            }
+        else
+            {
+            $extra = "";
+            }
+        @book_name_parts = (split /-/, $first_token);
         if (scalar @book_name_parts == 1)
             {
             my $book_name_proper = shift @book_name_parts;
             #$book_name_proper =~ s/(\w+)/\u\L$1/;
-            $book_name_proper = "\u\L$book_name_proper";
+            $book_name_proper = "\u\L$book_name_proper" . $extra;
             return $book_name_proper;
             }
         elsif (scalar @book_name_parts == 2)
             {
             my $book_number = shift @book_name_parts;
-            if ($book_number =~ /^[Pp]/)
+            if ($book_number =~ /^i/)
                 {
-                $book_number = "\u\L$book_number";
+                $book_number = uc($book_number);
                 }
             else
                 {
-                $book_number = uc($book_number);
+                $book_number = "\u\L$book_number";
                 }
             my $book_name_proper = shift @book_name_parts;
             #$book_name_proper =~ s/(\w+)/\u\L$1/;
             $book_name_proper = "\u\L$book_name_proper";
-            return "$book_number $book_name_proper";
+            return "$book_number $book_name_proper" . $extra;
             }
         else
             {
-            return $unprocessed_book_name
+            return $unprocessed_book_name;
             }
         }
     }

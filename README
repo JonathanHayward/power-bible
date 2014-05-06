@@ -1,0 +1,27 @@
+All original material in the Powered Access Bible is (c) 2001-4 by Jonathan
+Hayward. The Powered Access Bible is released under the license terms stated in
+doc/license.txt. To install from this directory, type:
+
+    ./install
+
+The file general/config may be modified to customise the script's behavior. You
+can change the default translation, for instance, or make it seatch the
+apocrypha by default.
+
+If you have the Powered Access Bible installed to e.g.
+
+    http://127.0.0.1/cgi-bin/powerbible
+
+then you can specify a passage to look up by linking to:
+
+    http://127.0.0.1/cgi-bin/powerbible?passage=Genesis+1
+
+and/or a search term with:
+
+    http://127.0.0.1/cgi-bin/powerbible?query=love
+
+May God bless you as you read!
+
+    Jonathan Hayward
+    jonathan.hayward@pobox.com
+    http://JonathansCorner.com

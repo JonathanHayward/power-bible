@@ -1035,8 +1035,10 @@ proc displayNewTopicMenu {} {
 proc displayQueryForm {} {
     if {[CGIValue lookupMode] == "passage"} {
         set lookup [getCanonicalReference]
+        debugLog $lookup
         set lookup [eval "exec bin/concordance --displayable-book-name\
           $lookup"]
+        debugLog $lookup
     } else {
         set lookup [CGIValue lookup]
     }
@@ -3644,9 +3646,42 @@ proc showFrames {} {
     #puts -nonewline "<frameset cols=\"40,60\" "
     puts -nonewline "frameborder=\"0\" frameborder=\"no\" framespacing=\"0\"\
         border=\"0\">\n\
-        <frame src=\"[getActionURL]?lookupMode=concordance\"\
+        <frame src=\"[getActionURL]?lookupMode=concordance"
+    if {[CGIValue query] != ""} {
+        set query [CGIValue query]
+        regsub -all {\s+} $query {+} query
+        puts -nonewline "&lookup=$query"
+        puts -nonewline "&firstBook=firstAvailableBook"
+        puts -nonewline "&lastBook=lastAvailableBook"
+        puts -nonewline "&includeOldTestament="
+        if {[getConfigValue "includeOldTestamentByDefault" "yes"]} {
+            puts -nonewline "yes"
+        } else {
+            puts -nonewline "no"
+        }
+        puts -nonewline "&includeApocrypha="
+        if {[getConfigValue "includeApocryphaByDefault" "yes"]} {
+            puts -nonewline "yes"
+        } else {
+            puts -nonewline "no"
+        }
+        puts -nonewline "&includeNewTestament="
+        if {[getConfigValue "includeNewTestamentByDefault" "yes"]} {
+            puts -nonewline "yes"
+        } else {
+            puts -nonewline "no"
+        }
+
+    }
+    puts -nonewline "\"\
         name=\"concordance\">\n\
-        <frame src=\"[getActionURL]?lookupMode=passage\" name=\"passage\">\n\
+        <frame src=\"[getActionURL]?lookupMode=passage"
+    if {[CGIValue passage] != ""} {
+        set passage [CGIValue passage]
+        regsub -all {\s+} $passage {+} passage
+        puts -nonewline "&lookup=$passage"
+    }
+    puts -nonewline "\" name=\"passage\">\n\
         </frameset>\n"
     puts -nonewline "<noframes>\n\
         <h1>The Powered Access Bible:</h1>\n\
@@ -3996,7 +4031,7 @@ proc writeTopic {topicID topicContents} {
 #
 
 init
-if {[CGIQuery] != ""} {
+if {[CGIValue lookupMode] != ""} {
 
     pageStart
 
