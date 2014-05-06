@@ -16,7 +16,7 @@ proc displayAndSay {text chapter verse} {
         set modifiedText [removeCitation $text]
         foreach currentWord $highlightedWords {
             regsub -all -nocase $currentWord $modifiedText "<span\
-                class=\"highlighted\">$currentWord</span>" modifiedText
+                class=\"highlighted\">&</span>" modifiedText
         }
         puts -nonewline "<p><a\
             name=\"$chapter.$verse\"></a><span\

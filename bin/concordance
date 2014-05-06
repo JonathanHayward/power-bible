@@ -393,7 +393,43 @@ foreach $current_line (@lines)
                     }
                 foreach $current_word (@words)
                     {
-                    $verse =~ s/$current_word/<span class=\"highlighted\">$current_word<\/span>/gi;
+                    # Kludge because I don't have Perl reference
+                    # materials handy. Sorry this is so ugly. I'm not writing
+                    # the exponential time to handle this case-insensitive this
+                    # way. It should handle proper, upper, and lower case
+                    # correctly.
+                    $lower = lc($current_word);
+                    $proper = $lower;
+                    $proper =~ s/^a/A/;
+                    $proper =~ s/^b/B/;
+                    $proper =~ s/^c/C/;
+                    $proper =~ s/^d/D/;
+                    $proper =~ s/^e/E/;
+                    $proper =~ s/^f/F/;
+                    $proper =~ s/^g/G/;
+                    $proper =~ s/^h/H/;
+                    $proper =~ s/^i/I/;
+                    $proper =~ s/^j/J/;
+                    $proper =~ s/^k/K/;
+                    $proper =~ s/^l/L/;
+                    $proper =~ s/^m/M/;
+                    $proper =~ s/^n/N/;
+                    $proper =~ s/^o/O/;
+                    $proper =~ s/^p/P/;
+                    $proper =~ s/^q/Q/;
+                    $proper =~ s/^r/R/;
+                    $proper =~ s/^s/S/;
+                    $proper =~ s/^t/T/;
+                    $proper =~ s/^u/U/;
+                    $proper =~ s/^v/V/;
+                    $proper =~ s/^w/W/;
+                    $proper =~ s/^x/X/;
+                    $proper =~ s/^y/Y/;
+                    $proper =~ s/^z/Z/;
+                    $upper = uc($lower);
+                    $verse =~ s/$lower/<span class=\"highlighted\">$lower<\/span>/g;
+                    $verse =~ s/$proper/<span class=\"highlighted\">$proper<\/span>/g;
+                    $verse =~ s/$upper/<span class=\"highlighted\">$upper<\/span>/g;
                     }
                 print "$verse</p>\n";
                 }

@@ -1167,13 +1167,22 @@ proc displayQueryForm {} {
             }
             puts "<input type=\"hidden\" name=\"matchWholeWordsOnly\"\
                 value=\"[CGIValue matchWholeWordsOnly]\">\n"
-            if {[CGIValue BibleVersion] != ""} {
-                puts "<input type=\"hidden\" name=\"BibleVersion\"\
-                    value=\"[CGIValue BibleVersion]\">"
-            } else {
-                puts "<input type=\"hidden\" name=\"BibleVersion\"\
-                    value=\"[getConfigValue defaultBibleVersion RSV]\">"
+            foreach currentVersion [getAvailableBibleVersions] {
+                puts -nonewline "<input type=\"radio\" name=\"BibleVersion\"\
+                  value=\"$currentVersion\" "
+                if {$currentVersion == [getBibleVersion]} {
+                    puts -nonewline "checked"
+                }
+                puts -nonewline "> $currentVersion&nbsp; "
             }
+            puts "</td></tr><tr><td>"
+            #if {[CGIValue BibleVersion] != ""} {
+                #puts "<input type=\"hidden\" name=\"BibleVersion\"\
+                    #value=\"[CGIValue BibleVersion]\">"
+            #} else {
+                #puts "<input type=\"hidden\" name=\"BibleVersion\"\
+                    #value=\"[getConfigValue defaultBibleVersion RSV]\">"
+            #}
             if {[CGIValue includeOldTestament] != "" || [CGIValue\
                 includeApocrypha] != "" || [CGIValue includeNewTestament]\
                 != ""} {
@@ -1265,6 +1274,18 @@ proc displayStandardChoices {} {
 	puts -nonewline "</p>\n<p><input type=\"image\" name=\"Go!\"\ border=\"0\"\
 		src=\"[getDocumentURL]/submit.jpg\"></p>\n"
 	#puts -nonewline "<input type=\"submit\" value=\"Go!\"></p>\n"
+}
+
+proc displayVersionChoiceIfAppropriate {} {
+    foreach currentVersion [getAvailableBibleVersions] {
+        puts -nonewline "<input type=\"radio\" name=\"BibleVersion\"\
+          value=\"$currentVersion\" "
+        if {$currentVersion == [getBibleVersion]} {
+            puts -nonewline "checked"
+        }
+        puts -nonewline "> $currentVersion&nbsp; "
+    }
+    #puts -nonewline "</td></tr><tr><td>"
 }
 
 proc editFolder {identifier} {
@@ -3647,6 +3668,10 @@ proc showFrames {} {
     puts -nonewline "frameborder=\"0\" frameborder=\"no\" framespacing=\"0\"\
         border=\"0\">\n\
         <frame src=\"[getActionURL]?lookupMode=concordance"
+    if {[CGIValue BibleVersion] != ""} {
+        puts -nonewline "&BibleVersion="
+        puts -nonewline [CGIValue BibleVersion]
+    }
     if {[CGIValue query] != ""} {
         set query [CGIValue query]
         regsub -all {\s+} $query {+} query
@@ -3676,6 +3701,10 @@ proc showFrames {} {
     puts -nonewline "\"\
         name=\"concordance\">\n\
         <frame src=\"[getActionURL]?lookupMode=passage"
+    if {[CGIValue BibleVersion] != ""} {
+        puts -nonewline "&BibleVersion="
+        puts -nonewline [CGIValue BibleVersion]
+    }
     if {[CGIValue passage] != ""} {
         set passage [CGIValue passage]
         regsub -all {\s+} $passage {+} passage
@@ -4076,7 +4105,7 @@ if {[CGIValue lookupMode] != ""} {
         puts -nonewline "<p align=\"center\">This web tool was created by\
             Jonathan Hayward (<a href=\"http://JonathansCorner.com\"\
             target=\"top\">other creations</a>; <a\
-            href=\"mailto:jonathan.hayward@pobox.com\">e-mail</a>).</p>\n"
+            href=\"mailto:webmaster@jonathanscorner.com?Subject=Jonathan%27s%20Corner\">e-mail</a>).</p>\n"
         puts -nonewline "<p align=\"center\"><a\
             href=\"[getDocumentURL]/tou.html\" target=\"_blank\">Terms of\
             Use</a></p>"
@@ -4091,6 +4120,7 @@ if {[CGIValue lookupMode] != ""} {
             puts "<h2>The Holy Bible, [getBibleVersion]</h2>"
         }
         displayQueryForm
+        displayVersionChoiceIfAppropriate
         displayChapterNavigationIfAppropriate
         if {[CGIValue highlightedWords] == ""} {
             set result [exec "bin/passage" "--version" [getBibleVersion]\
