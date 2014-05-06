@@ -453,7 +453,11 @@ proc changePassword {userId password duplicate} {
 }
 
 proc chaptersIn {book} {
-    set files [glob "versions/[getBibleVersion]/$book*"]
+    set files [glob -nocomplain "versions/[getBibleVersion]/$book*"]
+    if { $files == "" } {
+        registerError --passage "I'm sorry; I could not find the book $book."
+        return ""
+    }
     return [exec tail -1 [lindex $files 0] | cut -f1 -d:]
 }
 
@@ -795,7 +799,7 @@ proc displayChapterNavigationIfAppropriate {} {
         {^[\w\-]+ \d+$} {
             set referenceParts [split [getCanonicalReference] " "]
             set book [lindex $referenceParts 0]
-            set files [glob "versions/[getBibleVersion]/$book*"]
+            set files [glob -nocomplain "versions/[getBibleVersion]/$book*"]
             if {[llength $files] == 0} {
                 return
             }
@@ -841,7 +845,7 @@ proc displayCreateLogin {} {
 		<p>We need your e-mail address so we can send you your\
 		password if it is ever lost.  (What's the\
 		<a href=\"[getDocumentURL]/privacy.html\"\
-		target=\"_blank\">privacy policy</a> about\
+		target=\"_top\">privacy policy</a> about\
 		this?)</p>\n\
 		<p>Children under 13 must get their parents'\
 		permission to set up an account (this is legally\
@@ -1508,49 +1512,6 @@ proc entrySort {toSort {criterionToSortOn "topicName"}} {
 	[entrySort $greaterOrEqualBin $criterionToSortOn]]
 }
 
-#proc entrySort {toSort {criterionToSortOn "topicName"}} {
-#	global metaData
-#	#debugLog "es"
-#	# Bubble entrySort the results--we should be working with small enough data that
-#	# this is insignificant next to the time taken for i.e. I/O and network
-#	# traffic.
-#	for {set largeIndex 0} {$largeIndex < [expr [llength $toSort] - 1]} {incr \
-#	  largeIndex} {
-#		#Don't start at $largeIndex -- I was trimming the wrong side.
-#		for {set smallIndex 0} {$smallIndex < [expr [llength \
-#		  $toSort] - 1 - $largeIndex]} {incr smallIndex} {
-#			#debugLog "es0.0.1 $largeIndex $smallIndex [lindex $toSort $smallIndex]\
-#			  #[lindex $toSort [expr $smallIndex + 1]]"
-#			switch $criterionToSortOn {
-#				fullPathname {
-#					set currentFieldToCompare [getFullPath [lindex \
-#					  $toSort $smallIndex]]
-#					set nextFieldToCompare [getFullPath [lindex $toSort \
-#					  [expr $smallIndex + 1]]]
-#				}
-#				topicName -
-#				default {
-#					set currentFieldToCompare [getTopicName [lindex \
-#					  $toSort $smallIndex]]
-#					set nextFieldToCompare [getTopicName [lindex $toSort \
-#					  [expr $smallIndex + 1]]]
-#				}
-#			}
-#			#debugLog "es1 $currentFieldToCompare $nextFieldToCompare"
-#			if {[string compare -nocase $currentFieldToCompare \
-#			  $nextFieldToCompare] > 0} {
-#				  #debugLog "es0.1.2 Swapping $current"
-#				set juggle [lindex $toSort $smallIndex]
-#				set toSort [lreplace $toSort $smallIndex $smallIndex \
-#				  [lindex $toSort [expr $smallIndex + 1]]]
-#				set toSort [lreplace $toSort [expr $smallIndex + 1] \
-#				  [expr $smallIndex + 1] $juggle]
-#			}
-#		}
-#	}
-#	return $toSort
-#}
-
 proc entrySortWithParent {parentID {criterionToSortOn "topicName"}} {
 	global metaData
 	#debugLog "eswp"
@@ -1686,6 +1647,8 @@ proc getCanonicalReference {} {
         set numeric 1
     }
     regsub -all { } $lookup {\-} lookup
+    regsub {^\-} $lookup {} lookup
+    regsub {^\\\-} $lookup {} lookup
     switch [string index $lookup 0] {
         1 {
             regsub 1 $lookup i lookup
@@ -2432,6 +2395,7 @@ proc init {} {
 	global collapsedObject
 	global configOptions
 	global debugMode
+    global errorMessage
 	global lockedFiles
 	global metaDataRead
 	global metaDataWritten
@@ -2446,6 +2410,7 @@ proc init {} {
 	#set debugMode 0
 	 debugLog "Starting processing..."
 	set administrativeActionResult ""
+    set errorMessage ""
 	set metaDataRead 0
 	set metaDataWritten 0
 	set collapsedObject ""
@@ -3258,6 +3223,11 @@ proc readTopic {filename} {
 		close $fileId
 	}
 	return $result
+}
+
+proc registerError {version currentErrorMessage} {
+    global errorMessage
+    set errorMessage "$errorMessage$currentErrorMessage"
 }
 
 proc registerQueryData {field value} {
@@ -4103,11 +4073,12 @@ if {[CGIValue lookupMode] != ""} {
             }
         }
         puts -nonewline "<p align=\"center\">This web tool was created by\
-            Jonathan Hayward (<a href=\"http://JonathansCorner.com\"\
-            target=\"top\">other creations</a>; <a\
-            href=\"mailto:webmaster@jonathanscorner.com?Subject=Jonathan%27s%20Corner\">e-mail</a>).</p>\n"
+            <a href=\"http://JonathansCorner.com\">Jonathan Hayward</a> (<a href=\"http://JonathansCorner.com\"\
+            target=\"_top\">home page: Jonathan's Corner</a>; <a\
+            href=\"http://JonathansCorner.com/about/contact/\">contact
+            information</a>).</p>\n"
         puts -nonewline "<p align=\"center\"><a\
-            href=\"[getDocumentURL]/tou.html\" target=\"_blank\">Terms of\
+            href=\"[getDocumentURL]/tou.html\" target=\"_top\">Terms of\
             Use</a></p>"
     } elseif  {[CGIValue lookupMode] == "passage"} {
         puts "<h1>The Powered Access Bible:<br><em>Passage Lookup</em></h1>"
@@ -4139,20 +4110,34 @@ if {[CGIValue lookupMode] != ""} {
             switch -regexp [CGIValue lookup] {
                 {[\w]} {
                     puts "<p>I'm sorry, but I couldn't find anything for that\
-                        reference. <strong>Try something like 'Deuteronomy\
-                        6:4-9' or 'I Corinthians 13'.</strong> You might use\
+                        reference.</p>\n\
+                        <p><strong>Were you trying to do a keyword search? If\
+                        so, please copy and\
+                        paste \"<em>[CGIValue lookup]</em>\" into the\
+                        <em>left</em> search box.</strong> The <em>right</em>
+                        search box lets you look up a passage if you already
+                        know where it is.</p>\n\
+                        <p>If you were trying to look up a specific passage,
+                        try something like 'Deuteronomy\
+                        6:4-9' or 'I Corinthians 13'. You might use\
                         the full name of the book, and making sure the chapter\
                         and verses really exist. (You can't read Mark 17\
                         because there <em>isn't</em> a Mark 17: Mark is only
                         16 chapters long.)</p>"
+                        
                 }
             }
         }
         displayChapterNavigationIfAppropriate
         puts "<br>"
         puts [exec "bin/concordance" "--version" [getBibleVersion] "--list-books"]
+        puts -nonewline "<p align=\"center\">This web tool was created by\
+            <a href=\"http://JonathansCorner.com\">Jonathan Hayward</a> (<a href=\"http://JonathansCorner.com\"\
+            target=\"_top\">home page: Jonathan's Corner</a>; <a\
+            href=\"http://JonathansCorner.com/about/contact/\">contact
+            information</a>).</p>\n"
         puts -nonewline "<p align=\"center\"><a\
-            href=\"[getDocumentURL]/tou.html\" target=\"_blank\">Terms of\
+            href=\"[getDocumentURL]/tou.html\" target=\"_top\">Terms of\
             Use</a></p>"
     } else {
         displayQueryForm

@@ -396,8 +396,7 @@ foreach $current_line (@lines)
                     # Kludge because I don't have Perl reference
                     # materials handy. Sorry this is so ugly. I'm not writing
                     # the exponential time to handle this case-insensitive this
-                    # way. It should handle proper, upper, and lower case
-                    # correctly.
+                    # way. It handles proper, upper, and lower case correctly.
                     $lower = lc($current_word);
                     $proper = $lower;
                     $proper =~ s/^a/A/;

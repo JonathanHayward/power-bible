@@ -93,7 +93,7 @@ includeNewTestamentByDefault yes
 # The current version and release of the Powered Access Bible.
 #
 
-versionNumber 1.1R1
+versionNumber 1.1.1R1
 
 #
 # How many columns wide text-related inputs are.  You should set this value
