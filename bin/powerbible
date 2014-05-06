@@ -1126,11 +1126,11 @@ proc displayQueryForm {} {
             }
             puts -nonewline "</td></tr><tr><td>"
             puts -nonewline "<input type=\"checkbox\"\
-                name=\"matchPartialWords\""
-            if {[CGIValue matchPartialWords] != ""} {
+                name=\"matchWholeWordsOnly\""
+            if {[CGIValue matchWholeWordsOnly] != ""} {
                 puts -nonewline " checked"
             }
-            puts -nonewline "> Match partial words"
+            puts -nonewline "> Match whole words only"
             puts -nonewline "</td></tr><tr><td>"
             foreach currentVersion [getAvailableBibleVersions] {
                 puts -nonewline "<input type=\"radio\" name=\"BibleVersion\"\
@@ -1163,8 +1163,8 @@ proc displayQueryForm {} {
                 puts "<input type=\"hidden\" name=\"lastBook\"\
                     value=\"lastAvailableBook\">"
             }
-            puts "<input type=\"hidden\" name=\"matchPartialWords\"\
-                value=\"[CGIValue matchPartialWords]\">\n"
+            puts "<input type=\"hidden\" name=\"matchWholeWordsOnly\"\
+                value=\"[CGIValue matchWholeWordsOnly]\">\n"
             if {[CGIValue BibleVersion] != ""} {
                 puts "<input type=\"hidden\" name=\"BibleVersion\"\
                     value=\"[CGIValue BibleVersion]\">"
@@ -2440,7 +2440,7 @@ proc init {} {
         "includeOldTestamentByDefault"\
         "includeApocryphaByDefault"\
         "includeNewTestamentByDefault"\
-        "matchPartialWordsByDefault"\
+        "matchWholeWordsOnlyByDefault"\
 		"textWidth"\
         "versionNumber"\
 		}
@@ -4023,7 +4023,7 @@ if {[CGIQuery] != ""} {
                     [getBibleVersion] $sectionsToSearch --actionURL\
                     [getActionURL] --first-book [CGIValue firstBook]\
                     --last-book [CGIValue lastBook]"
-                if {[CGIValue matchPartialWords] != ""} {
+                if {[CGIValue matchWholeWordsOnly] == ""} {
                     set evalCommand "$evalCommand --match-partial-words"
                 }
                 set evalCommand "$evalCommand [CGIValue lookup]"

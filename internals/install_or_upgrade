@@ -103,7 +103,7 @@ def install_or_upgrade():
         output("\nInstalling...")
     elif get_script_mode == "upgrade":
         output("\nUpgrading...")
-    if get_script_mode() == "install":
+    if get_script_mode() == "install" or get_script_mode() == "upgrade":
         os.system("rm -rf " + private_data_directory)
         os.system("mkdir -p " + private_data_directory)
         os.system("rm -rf " + private_data_directory)
@@ -239,13 +239,6 @@ something like "/usr/share/powerbible/" or "~/powerbible/".
     output("""
 Private data directory""")
     private_data_directory = get_value(private_data_directory)
-    if get_script_mode() == "upgrade":
-        output(\
-"""
-Have you customized your Powered Access Bible after installation and any
-upgrades (yes/no)""")
-        has_installation_been_customized =\
-          get_value(has_installation_been_customized)
     output(\
 """
 You have selected the following options:
@@ -258,13 +251,6 @@ You have selected the following options:
     Full Tcl path: """ + full_tcl_path + """
     HTML root directory: """ + html_root_directory + """
     Private data directory: """ + private_data_directory)
-    if get_script_mode() == "upgrade":
-        output(\
-"""
-
-    Has installation been customized: """ + has_installation_been_customized)
-        if is_true(has_installation_been_customized):
-            pass
     output(\
 """
 

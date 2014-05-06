@@ -329,7 +329,7 @@ foreach $book_in_range ("firstAvailableBook", (split / /,
 $words = join " ", @words;
 chdir "versions/$version/";
 $first_word = $words[0];
-$grep_result = `grep -i $first_word $final_selected_books`;
+$grep_result = `grep -iH $first_word $final_selected_books`;
 chomp $grep_result;
 @lines = split /\n/, $grep_result;
 foreach $current_word (@words)
