@@ -1,4 +1,4 @@
-<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<!DOCTYPE html>
 <html>
 <head>
 <link rel="icon" href="/favicon-tms.ico" type="image/x-icon">
@@ -7,22 +7,112 @@
 <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
 <title>The Powered Access Bible</title>
 <style>
-<!--
-A { text-decoration: none; font-weight: bold }
-span.heading { font-size: larger; font-weight: bold }
-span.highlighted { font-size: larger; font-weight: bold }
-span.verse_reference { font-weight: bold }
--->
+
+body
+    {
+    background-color: white;
+    font-family: Verdana, Arial, sans;
+    line-height: 1.9em;
+    margin: .5in;
+    }
+
+h1
+    {
+    background-color: silver;
+    background: -webkit-gradient(linear, 0% 0%, 0% 100%, from(#e0e0e0), to(#f8f8f8));
+    background: -webkit-linear-gradient(top, #f8f8f8, #e0e0e0);
+    background: -moz-linear-gradient(top, #f8f8f8, #e0e0e0);
+    background: -ms-linear-gradient(top, #f8f8f8, #e0e0e0);
+    background: -o-linear-gradient(top, #f8f8f8, #e0e0e0);
+    border: 1px solid #e0e0e0;
+    border-radius: 20px;
+    margin-bottom: 40px;
+    padding: 15px;
+    text-align: center;
+    }
+
+h2
+    {
+    background-color: silver;
+    background: -webkit-gradient(linear, 0% 0%, 0% 100%, from(#e8e8e8), to(#f8f8f8));
+    background: -webkit-linear-gradient(top, #f8f8f8, #e8e8e8);
+    background: -moz-linear-gradient(top, #f8f8f8, #e8e8e8);
+    background: -ms-linear-gradient(top, #f8f8f8, #e8e8e8);
+    background: -o-linear-gradient(top, #f8f8f8, #e8e8e8);
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 10px;
+    position: absolute;
+    top: 178px;
+    right: 50px;
+    }
+
+input[type=image]
+    {
+    position: absolute;
+    top: 181px;
+    }
+input[type=text]
+    {
+    border: 2px solid black;
+    font-size: 1.7em;
+    padding: 5px;
+    }
+
+#quotes
+    {
+    border: 4px solid #c79431;
+    padding: 25px;
+    margin-left: 25%;
+    width: 50%;
+    }
+
+.search
+    {
+    background-color: #fff170;
+    background: -webkit-gradient(linear, 0% 0%, 0% 100%, from(#d8a441), to(#fff180));
+    background: -webkit-linear-gradient(top, #fff190, #e8b451);
+    background: -moz-linear-gradient(top, #fff190, #e8b451);
+    background: -ms-linear-gradient(top, #fff190, #e8b451);
+    background: -o-linear-gradient(top, #fff190, #e8b451);
+    }
+
+span.heading
+    {
+    font-size: larger;
+    font-weight: bold;
+    }
+
+span.highlighted
+    {
+    font-size: larger;
+    font-weight: bold;
+    }
+
+span.verse_reference
+    {
+    font-weight: bold;
+    }
+
+::-webkit-input-placeholder
+    {
+    /* WebKit browsers */
+    color:    #777;
+    }
+:-moz-placeholder
+    {
+    /* Mozilla Firefox 4 to 18 */
+    color:    #777;
+    }
+::-moz-placeholder
+    { /* Mozilla Firefox 19+ */
+    color:    #777;
+    }
+:-ms-input-placeholder
+    {
+    /* Internet Explorer 10+ */
+    color:    #777;
+    }
 </style>
 </head>
-<body bgcolor="white" link="#2040B0" vlink="#A040B0" alink="#B04040"
-text="black" background="/powerbible/background.jpg">
-<!--
-Similar colors to the default, but mute the blue/purple/red somewhat.
--->
-<table width="100%" border="0" cellpadding="0" cellspacing="0">
-	<tr>
-		<td width="80"> 
-			&nbsp;
-		</td>
-		<td>
+<body>

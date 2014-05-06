@@ -120,6 +120,8 @@ def install_or_upgrade():
       document_url)
     substitute(private_data_directory + "/general/config", "FILE_PREFIX", \
       private_data_directory)
+    substitute(private_data_directory + "/general/header", "DOCUMENT_URL", \
+      document_url)
     os.system("rm -rf " + cgi_executable_path)
     os.system("mkdir -p " + cgi_executable_path)
     os.system("rm -rf " + cgi_executable_path)

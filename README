@@ -1,6 +1,13 @@
-All original material in the Powered Access Bible is (c) 2001-4 by Jonathan
-Hayward. The Powered Access Bible is released under the license terms stated in
-doc/license.txt. To install from this directory, type:
+All original material in the Powered Access Bible is (c) 2001-8 by Jonathan
+Hayward. The Powered Access Bible is available to you under your choice of the
+terms of the Artistic License, found in doc/artistic.txt, the General Public
+License version 2.0, found in doc/gpl.txt, or the Massachussetts Institute of
+Technology license, found in doc/mit.txt. The translations are available under
+the licensing terms specified in doc/license.txt. If you like this software,
+you are invited (but not required) to consider linking to
+http://JonathansCorner.com.
+
+To install from this directory, type:
 
     ./install
 

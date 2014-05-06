@@ -1,8 +1,7 @@
-        </td>
-        <td width="30">
-            &nbsp;
-        </td>
-    </tr>
-</table>
+<div id="quotes">
+</div>
+
+<script src="/include/bible.js">
+</script>
 </body>
 </html>

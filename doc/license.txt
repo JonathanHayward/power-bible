@@ -2,10 +2,12 @@ All original material released with the Powered Access Bible, including all
 executable code, is (c) 2001-3 by Jonathan Hayward. It is released under the
 user's choice of the Artistic License (which should be available in the file
 artistic.txt in this directory, or on the web at
-http://www.perl.com/language/misc/Artistic.html) and the Free Software
+http://www.perl.com/language/misc/Artistic.html), the Free Software
 Foundation's General Public License (which should be available in the file
 gpl.txt in this directory or on the web at
-http://www.gnu.org/copyleft/gpl.html).
+http://www.gnu.org/copyleft/gpl.html), or the Massachusetts Institute of
+Technology License (which should be in the file mit.txt or on the web at
+http://www.opensource.org/licenses/mit-license.php).
 
 The King James Version is in the public domain.
 

@@ -1,9 +1,12 @@
 #!FULL_TCL_PATH
 
 #
-# The Powered Access Bible is (c) 2001-3 by Jonathan Hayward, released under
-# the Artistic License, and comes with no warranty. Please visit my homepage at
-# http://JonathansCorner.com to see what else I've created--not just software.
+# The Powered Access Bible is (c) 2001-8 by Jonathan Hayward, released under
+# the Artistic License, the General Public License Version 2.0, and the
+# Massachusetts Institute of Technology License, and comes with no warranty.
+# Please visit my homepage at http://JonathansCorner.com to see what else I've
+# created--not just software. If you like this software, please consider
+# linking to my homepage, http://JonathansCorner.com.
 #
 # I'd like to thank the following people for helping me debug or otherwise
 # get this program in working order:
@@ -22,7 +25,7 @@
 #
 # Thanks also to Kapocs Web Design, kapocs.hypermart.net, and HSD2 Tech
 # Support, www.harrison.k12.co.us, for providing attractive backgrounds for
-# free download--including the one I used.
+# free download--including the one I originally used.
 #
 
 set configFilename "CONFIG_FILENAME"
@@ -86,7 +89,7 @@ proc CGIParse {} {
 }
 
 #Adapted from Brent B. Welch, _Practical Programming in Tcl and Tk_
-proc CGIValue {key} {
+proc CGIValue {key {defaultValue {}}} {
 	global cgi
 	if {[info exists cgi($key)]} {
 		if {[mightBeUsedInFilename $key]} {
@@ -95,7 +98,7 @@ proc CGIValue {key} {
 			return $cgi($key)
 		}
 	} else {
-		return {}
+		return $defaultValue
 	}
 }
 
@@ -453,10 +456,8 @@ proc changePassword {userId password duplicate} {
 }
 
 proc chaptersIn {book} {
-    set files [glob -nocomplain "versions/[getBibleVersion]/$book*"]
-    if { $files == "" } {
-        registerError --passage "I'm sorry; I could not find the book $book."
-        return ""
+    if {[catch {set files [glob "versions/[getBibleVersion]/$book*"]}]} {
+        return 0
     }
     return [exec tail -1 [lindex $files 0] | cut -f1 -d:]
 }
@@ -799,10 +800,16 @@ proc displayChapterNavigationIfAppropriate {} {
         {^[\w\-]+ \d+$} {
             set referenceParts [split [getCanonicalReference] " "]
             set book [lindex $referenceParts 0]
-            set files [glob -nocomplain "versions/[getBibleVersion]/$book*"]
-            if {[llength $files] == 0} {
-                return
+            if {[catch { set files [glob "versions/[getBibleVersion]/$book*"] }]} {
+            puts -nonewline "<script>\n\
+                top='"
+            displayURL
+            puts -nonewline "';\n\
+            </script>"
             }
+            #if {[llength $files] == 0} {
+                #return
+            #}
             set chapter [lindex [split [lindex $referenceParts 1 ] ":"] 0]
             set length [chaptersIn $book]
             displayChapterNavigationInternal $book $chapter $length
@@ -813,23 +820,24 @@ proc displayChapterNavigationIfAppropriate {} {
 proc displayChapterNavigationInternal {book chapter length} {
     puts -nonewline "<p align=\"center\">"
     if {$chapter > 1} {
-        puts "<a href=\"[getActionURL]?lookupMode=passage&lookup=$book+[expr\
-            $chapter - 1]&highlightedWords=[CGIValue\
-            highlightedWords]&BibleVersion=[getBibleVersion]\"\
+        puts "<a href=\"[getActionURL]?lookupMode=passage&passage=$book+[expr\
+            $chapter - 1]&search=[CGIValue\
+            search]&BibleVersion=[getBibleVersion]\"\
             >Previous Chapter</a>"
     } else {
         puts -nonewline "Previous Chapter"
     }
     puts -nonewline " | "
     if {$chapter < $length} {
-        puts "<a href=\"[getActionURL]?lookupMode=passage&lookup=$book+[expr\
-            $chapter + 1]&highlightedWords=[CGIValue\
-            highlightedWords]&BibleVersion=[getBibleVersion]\"\
+        puts "<a href=\"[getActionURL]?lookupMode=passage&passage=$book+[expr\
+            $chapter + 1]&search=[CGIValue\
+            search]&BibleVersion=[getBibleVersion]\"\
             >Next Chapter</a>"
     } else {
         puts -nonewline "Next Chapter"
     }
     puts -nonewline "</p>\n"
+    displayPermalink
 }
 proc displayCreateLogin {} {
 	#debugLog "dcl"
@@ -845,7 +853,7 @@ proc displayCreateLogin {} {
 		<p>We need your e-mail address so we can send you your\
 		password if it is ever lost.  (What's the\
 		<a href=\"[getDocumentURL]/privacy.html\"\
-		target=\"_top\">privacy policy</a> about\
+		target=\"_blank\">privacy policy</a> about\
 		this?)</p>\n\
 		<p>Children under 13 must get their parents'\
 		permission to set up an account (this is legally\
@@ -864,10 +872,9 @@ proc displayForParent {parentName {htmlPrefix ""}} {
 	foreach field [entrySortWithParent $parentName] {
 		if {[testMetaDataFlag $field "show"] || \
 		  [getPageMode] == "metaSnippets"} {
-			puts "$htmlPrefix<table border=\"0\" cellspacing=\"0\"\
-			  cellpadding=\"3\">\n<tr>\n"
+			puts $htmlPrefix
 			if {[getPageMode] == "snippets" || [getPageMode] == "connect"} {
-				puts "$htmlPrefix<td>"
+				puts "$htmlPrefix"
 				if {[testMetaDataFlag $field "expand"]} {
 					puts -nonewline "$htmlPrefix[getCollapseLinkBeginning\
 					  $field]"
@@ -889,7 +896,7 @@ proc displayForParent {parentName {htmlPrefix ""}} {
 						  border=\"0\" alt=\"\"></a>"
 					}
 				}
-				puts "$htmlPrefix</td><td>"
+				puts "$htmlPrefix"
 				if {[testUserFlag [getUserName] "editlink"]} {
 					puts -nonewline "$htmlPrefix[getEditLinkBeginning\
 					  $field]"
@@ -903,33 +910,32 @@ proc displayForParent {parentName {htmlPrefix ""}} {
 					}
 				}
 			} else {
-				puts "$htmlPrefix<td>"
+				puts "$htmlPrefix"
 				puts -nonewline "$htmlPrefix[getEditLinkBeginning $field]"
 			}
-			puts "$htmlPrefix[getOpenTopicNameTag][getTopicName $field][getCloseTopicNameTag]</a></td></tr>"
+			puts "$htmlPrefix[getOpenTopicNameTag][getTopicName $field][getCloseTopicNameTag]</a>"
 			if {[testMetaDataFlag $field "expand"] || [getPageMode] ==
 			"metaSnippets"} {
-				puts "$htmlPrefix<tr><td><img src=\"[getShadowIconFilename]\"\
-				  border=\"0\"></td>"
+				puts "$htmlPrefix<img src=\"[getShadowIconFilename]\"\
+				  border=\"0\">"
 				if {[testMetaDataFlag $field "expand"] || \
 				  [getPageMode] == "metaSnippets"} {
 					if {[testMetaDataFlag $field "folder"]} {
-						puts -nonewline "$htmlPrefix<td>"
+						puts -nonewline "$htmlPrefix"
 						displayForParent $field "	$htmlPrefix"
-						puts -nonewline "</td>"
+						puts -nonewline ""
 					} else {
 						if {[getPageMode] != "metaSnippets" && \
 						  [getPageMode] != "metaSnippetsAction"} {
-							puts -nonewline "$htmlPrefix<td>"
+							puts -nonewline "$htmlPrefix"
 							printHeader $field
 							printSnippet $field
-							puts -nonewline "</td>"
+							puts -nonewline ""
 						}
 					}
 				}
-				puts "$htmlPrefix</tr>"
+				puts "$htmlPrefix"
 				}
-			puts "$htmlPrefix</table>"
 		}
 	}
 }
@@ -1036,206 +1042,293 @@ proc displayNewTopicMenu {} {
 	puts "</select></p>"
 }
 
+proc displayPermalink {} {
+    puts -nonewline "<a href=\""
+    puts -nonewline [getActionURL]
+    puts -nonewline "?"
+    if {[CGIValue search [CGIValue highlightedWords]] != ""} {
+        set search [CGIValue search [CGIValue highlightedWords]]
+        regsub -all {\s+} $search {+} search
+        if {$search ne ""} {
+            puts -nonewline "search=$search&"
+        }
+    }
+    if {[CGIValue passage [CGIValue lookup]] != ""} {
+        set passage [CGIValue passage [CGIValue lookup]]
+        regsub -all {\s+} $passage {+} passage
+        if {$passage ne ""} {
+            puts -nonewline "passage=$passage&"
+        }
+    }
+    if {[CGIValue firstBook] != ""} {
+        set firstBook [CGIValue firstBook]
+        if {$firstBook ne "firstAvailableBook"} {
+            if {$firstBook ne ""} {
+                puts -nonewline "firstBook=[CGIValue firstBook]&"
+            }
+        }
+    }
+    if {[CGIValue lastBook] != ""} {
+        set lastBook [CGIValue lastBook]
+        if {$lastBook ne "lastAvailableBook"} {
+            if {$lastBook ne ""} {
+                puts -nonewline "lastbook=[CGIValue lastBook]&"
+            }
+        }
+    }
+    if {[CGIValue includeOldTestament] != ""} {
+        puts -nonewline "includeOldTestament=[CGIValue includeOldTestament]&"
+    }
+    if {[CGIValue includeApocrypha] != ""} {
+        puts -nonewline "includeApocrypha=[CGIValue includeApocrypha]&"
+    }
+    if {[CGIValue includeNewTestament] != ""} {
+        puts -nonewline "includeNewTestament=[CGIValue includeNewTestament]&"
+    }
+    if {[CGIValue BibleVersion] != ""} {
+        puts -nonewline "BibleVersion=[CGIValue BibleVersion]&"
+    }
+    if {[CGIValue advancedSearch] != ""} {
+        puts -nonewline "advancedSearch=[CGIValue advancedSearch]&"
+    }
+    puts -nonewline "e=basta\" target=\"top\">Permalink</a>"
+}
+
 proc displayQueryForm {} {
     if {[CGIValue lookupMode] == "passage"} {
-        set lookup [getCanonicalReference]
-        debugLog $lookup
-        set lookup [eval "exec bin/concordance --displayable-book-name\
-          $lookup"]
-        debugLog $lookup
+        set passage [getCanonicalReference]
+        set passage [eval "exec bin/concordance --displayable-book-name\
+          $passage"]
     } else {
-        set lookup [CGIValue lookup]
+        set passage [CGIValue passage [CGIValue lookup]]
     }
-    puts -nonewline "<form action=\"[getActionURL]\" method=\"post\" \
-        name=\"[getProgramMode]\">\n\
+    set documentURL [getConfigValue documentURL]
+    puts -nonewline "<script src=\"$documentURL/jquery.js\"></script>\n\
         <script language=\"JavaScript\">\n\
         <!--\n\
         function simple_or_advanced_search(advanced_value)\n\
             {\n\
-            document.[getProgramMode].advancedSearch.value = advanced_value\n\
-            document.[getProgramMode].submit()\n\
+            if (advanced_value == \"on\")\n\
+                {\n\
+                jQuery('.advanced_search').show();\n\
+                jQuery('.advanced_search_alternate').hide()\n\
+                document.bibletool.advancedSearch.value = 'on'\n\
+                }\n\
+            else\n\
+                {\n\
+                jQuery('.advanced_search').hide();\n\
+                jQuery('.advanced_search_alternate').show()\n\
+                document.bibletool.advancedSearch.value = 'off'\n\
+                }\n\
             }\n\
         // -->\n\
-        </script>\n\
-        <table border=\"0\" cellspacing=\"0\" cellpadding=\"[getCellpadding]\">\
-        <tr><td>&nbsp;<input type=\"text\" size=\"[getTextWidth]\" value=\"$lookup\"\
-        name=\"lookup\">&nbsp; \n"
-    puts -nonewline "<input type=\"hidden\" name=\"highlightedWords\"\
-        value=\"[CGIValue highlightedWords]\">\n"
+        </script>"
+    if {[CGIValue lookupMode] == "concordance"} {
+        puts -nonewline "&nbsp;<input type=\"text\"\
+        placeholder=\" Search for...\"\
+        size=\"[getTextWidth]\"\
+        value=\"[CGIValue search [CGIValue highlightedWords]]\"\
+        name=\"search\">&nbsp; \n"
+    } else {
+        puts -nonewline "&nbsp;<input placeholder=\" E.g. John 1:1\"\
+        type=\"text\" size=\"[getTextWidth]\" value=\"$passage\"\
+        name=\"passage\">&nbsp; \n"
+        puts -nonewline "<input type=\"hidden\" name=\"search\"\
+            value=\"[CGIValue search [CGIValue highlightedWords]]\">\n"
+    }
     puts -nonewline "<input type=\"hidden\" name=\"advancedSearch\"\
         value=\"[CGIValue advancedSearch]\">\n"
     puts -nonewline "<input type=\"image\" name=\"Go!\"\ border=\"0\"\
 		src=\"[getDocumentURL]/submit.jpg\" align=\"middle\">\n"
-    puts -nonewline "</td></tr>\n<tr><td>"
+    puts -nonewline "<br />\n"
     if {[CGIValue lookupMode] == "concordance"} {
-        if {[CGIValue advancedSearch] == "on"} {
-            if {[CGIValue firstBook] != ""} {
-                set firstBook [CGIValue firstBook]
-            } else {
-                set firstBook "firstAvailableBook"
-            }
-            if {[CGIValue lastBook] != ""} {
-                set lastBook [CGIValue lastBook]
-            } else {
-                set lastBook "lastAvailableBook"
-            }
-            puts -nonewline "&nbsp;"
-            puts -nonewline [exec "bin/concordance" "--version"\
-                [getBibleVersion] "--menu_of_books" "first" $firstBook]
-            puts -nonewline "&nbsp; "
-            puts -nonewline [exec "bin/concordance" "--version"\
-                [getBibleVersion] "--menu_of_books" "last" $lastBook]
-            puts -nonewline "</td></tr><tr><td>"
-            if {[CGIValue includeOldTestament] != "" ||
-                [CGIValue includeApocrypha] != "" ||
-                [CGIValue includeNewTestament] != ""} {
-                puts -nonewline "<input type=\"checkbox\"\
-                    name=\"includeOldTestament\" "
-                if {[CGIValue includeOldTestament] != ""} {
-                    puts -nonewline "checked"
-                }
-                puts "> Old Testament&nbsp;"
-                puts -nonewline "<input type=\"checkbox\"\
-                    name=\"includeApocrypha\" "
-                if {[CGIValue includeApocrypha] != ""} {
-                    puts -nonewline "checked"
-                }
-                puts "> Apocrypha&nbsp;"
-                puts -nonewline "<input type=\"checkbox\"\
-                    name=\"includeNewTestament\" "
-                if {[CGIValue includeNewTestament] != ""} {
-                    puts -nonewline "checked"
-                }
-                puts "> New Testament"
-            } else {
-                puts -nonewline "<input type=\"checkbox\"\
-                    name=\"includeOldTestament\" "
-                if {[isTrue [getConfigValue "includeOldTestamentByDefault"\
-                    "yes"]]} {
-                    puts -nonewline "checked"
-                }
-                puts "> Old Testament&nbsp;&nbsp;"
-                puts -nonewline "<input type=\"checkbox\"\
-                    name=\"includeApocrypha\" "
-                if {[isTrue [getConfigValue "includeApocryphaByDefault"\
-                    "yes"]]} {
-                    puts -nonewline "checked"
-                }
-                puts "> Apocrypha&nbsp;&nbsp;"
-                puts -nonewline "<input type=\"checkbox\"\
-                    name=\"includeNewTestament\" "
-                if {[isTrue [getConfigValue "includeNewTestamentByDefault"\
-                    "yes"]]} {
-                    puts -nonewline "checked"
-                }
-                puts "> New Testament"
-            }
-            puts -nonewline "</td></tr><tr><td>"
-            puts -nonewline "<input type=\"checkbox\"\
-                name=\"matchWholeWordsOnly\""
-            if {[CGIValue matchWholeWordsOnly] != ""} {
-                puts -nonewline " checked"
-            }
-            puts -nonewline "> Match whole words only"
-            puts -nonewline "</td></tr><tr><td>"
-            foreach currentVersion [getAvailableBibleVersions] {
-                puts -nonewline "<input type=\"radio\" name=\"BibleVersion\"\
-                  value=\"$currentVersion\" "
-                if {$currentVersion == [getBibleVersion]} {
-                    puts -nonewline "checked"
-                }
-                puts -nonewline "> $currentVersion&nbsp; "
-            }
-            puts -nonewline "</td></tr><tr><td>"
-            puts -nonewline "<a\
-                href=\"JavaScript:simple_or_advanced_search('off')\">Simple\
-                Search</a>\n\
-                <noscript>\n\
-                <p><strong>You will need to turn JavaScript on to move\
-                between the simple and advanced search pages.</strong></p>\n\
-                </noscript>\n"
-        } else {
-            if {[CGIValue firstBook] != ""} {
-                puts "<input type=\"hidden\" name=\"firstBook\"\
-                    value=\"[CGIValue firstBook]\">"
-            } else {
-                puts "<input type=\"hidden\" name=\"firstBook\"\
-                    value=\"firstAvailableBook\">"
-            }
-            if {[CGIValue lastBook] != ""} {
-                puts "<input type=\"hidden\" name=\"lastBook\"\
-                    value=\"[CGIValue lastBook]\">"
-            } else {
-                puts "<input type=\"hidden\" name=\"lastBook\"\
-                    value=\"lastAvailableBook\">"
-            }
-            puts "<input type=\"hidden\" name=\"matchWholeWordsOnly\"\
-                value=\"[CGIValue matchWholeWordsOnly]\">\n"
-            foreach currentVersion [getAvailableBibleVersions] {
-                puts -nonewline "<input type=\"radio\" name=\"BibleVersion\"\
-                  value=\"$currentVersion\" "
-                if {$currentVersion == [getBibleVersion]} {
-                    puts -nonewline "checked"
-                }
-                puts -nonewline "> $currentVersion&nbsp; "
-            }
-            puts "</td></tr><tr><td>"
-            #if {[CGIValue BibleVersion] != ""} {
-                #puts "<input type=\"hidden\" name=\"BibleVersion\"\
-                    #value=\"[CGIValue BibleVersion]\">"
-            #} else {
-                #puts "<input type=\"hidden\" name=\"BibleVersion\"\
-                    #value=\"[getConfigValue defaultBibleVersion RSV]\">"
-            #}
-            if {[CGIValue includeOldTestament] != "" || [CGIValue\
-                includeApocrypha] != "" || [CGIValue includeNewTestament]\
-                != ""} {
-            } else {
-                if {[isTrue [getConfigValue "includeOldTestamentByDefault"\
-                    "yes"]]} {
-                    puts "<input type=\"hidden\" name=\"includeOldTestament\"\
-                        value=\"yes\">"
-                }
-                if {[isTrue [getConfigValue "includeApocryphaByDefault"\
-                    "yes"]]} {
-                    puts "<input type=\"hidden\" name=\"includeApocrypha\"\
-                        value=\"yes\">"
-                }
-                if {[isTrue [getConfigValue "includeNewTestamentByDefault"\
-                    "yes"]]} {
-                    puts "<input type=\"hidden\" name=\"includeNewTestament\"\
-                        value=\"yes\">"
-                }
-            }
-            puts -nonewline "<a\
-                href=\"JavaScript:simple_or_advanced_search('on')\">Advanced\
-                Search</a>\n\
-                <noscript>\n\
-                <p><strong>You will need to turn JavaScript on to move\
-                between the simple and advanced search pages.</strong></p>\n\
-                </noscript>\n"
-        }
-        puts -nonewline "</td></tr>\n<tr><td>"
+        puts -nonewline "Search terms, like <strong>\"<span style=\"background-color: white\">Father lights</span>\"</strong>"
+        displayVersionChoiceIfAppropriate
+    } else {
+        puts -nonewline "Passage reference, like <strong>&quot;I Corinthians 13&quot;</strong>"
     }
+    puts -nonewline "<br />\n"
+    if {[CGIValue lookupMode] == "concordance"} {
+        puts "<div>"
+        if {[CGIValue firstBook] != ""} {
+            set firstBook [CGIValue firstBook]
+        } else {
+            set firstBook "firstAvailableBook"
+        }
+        if {[CGIValue lastBook] != ""} {
+            set lastBook [CGIValue lastBook]
+        } else {
+            set lastBook "lastAvailableBook"
+        }
+        puts -nonewline "<div class='advanced_search'>"
+        puts -nonewline "&nbsp;"
+        puts -nonewline [exec "bin/concordance" "--version"\
+            [getBibleVersion] "--menu_of_books" "first" $firstBook]
+        puts -nonewline "&nbsp; "
+        puts -nonewline [exec "bin/concordance" "--version"\
+            [getBibleVersion] "--menu_of_books" "last" $lastBook]
+        puts -nonewline "<br />"
+        if {[CGIValue includeOldTestament] != "" ||
+            [CGIValue includeApocrypha] != "" ||
+            [CGIValue includeNewTestament] != ""} {
+            puts -nonewline "<input type=\"checkbox\"\
+                name=\"includeOldTestament\" "
+            if {[CGIValue includeOldTestament] != ""} {
+                puts -nonewline "checked"
+            }
+            puts "> Old Testament&nbsp;"
+            puts -nonewline "<input type=\"checkbox\"\
+                name=\"includeApocrypha\" "
+            if {[CGIValue includeApocrypha] != ""} {
+                puts -nonewline "checked"
+            }
+            puts "> Apocrypha&nbsp;"
+            puts -nonewline "<input type=\"checkbox\"\
+                name=\"includeNewTestament\" "
+            if {[CGIValue includeNewTestament] != ""} {
+                puts -nonewline "checked"
+            }
+            puts "> New Testament"
+        } else {
+            puts -nonewline "<input type=\"checkbox\"\
+                name=\"includeOldTestament\" "
+            if {[isTrue [getConfigValue "includeOldTestamentByDefault"\
+                "yes"]]} {
+                puts -nonewline "checked"
+            }
+            puts "> Old Testament&nbsp;&nbsp;"
+            puts -nonewline "<input type=\"checkbox\"\
+                name=\"includeApocrypha\" "
+            if {[isTrue [getConfigValue "includeApocryphaByDefault"\
+                "yes"]]} {
+                puts -nonewline "checked"
+            }
+            puts "> Apocrypha&nbsp;&nbsp;"
+            puts -nonewline "<input type=\"checkbox\"\
+                name=\"includeNewTestament\" "
+            if {[isTrue [getConfigValue "includeNewTestamentByDefault"\
+                "yes"]]} {
+                puts -nonewline "checked"
+            }
+            puts "> New Testament"
+        }
+        puts -nonewline "<br>"
+        puts -nonewline "<div style='margin-bottom: 10px;'>"
+        puts -nonewline "<input type=\"checkbox\"\
+            name=\"matchWholeWordsOnly\""
+        if {[CGIValue matchWholeWordsOnly] != ""} {
+            puts -nonewline " checked"
+        }
+        puts -nonewline "> Match whole words only<br />"
+        puts -nonewline "</div>"
+        puts -nonewline "<a class='advanced_search'\n
+            href=\"JavaScript:simple_or_advanced_search('off')\">Simple\
+            Search</a>\n\
+            <noscript>\n\
+            <p><strong>You will need to turn JavaScript on to move\
+            between the simple and advanced search pages.</strong></p>\n\
+            </noscript>\n\
+            </div>"
+        puts "</div>"
+        set advancedSearch [CGIValue advancedSearch off]
+        puts "<div
+        style='margin-top: 10px; margin-bottom: 10px;' class=\"advanced_search_alternate\">"
+        puts -nonewline "<a\
+            href=\"JavaScript:simple_or_advanced_search('on')\">Advanced\
+            Search</a>\n"
+        puts "<script>\n\
+            simple_or_advanced_search('$advancedSearch');\n\
+        </script>";
+        puts "</div>"
+    } else {
+        if {[CGIValue firstBook] != ""} {
+            puts "<input type=\"hidden\" name=\"firstBook\"\
+                value=\"[CGIValue firstBook]\">"
+        } else {
+            puts "<input type=\"hidden\" name=\"firstBook\"\
+                value=\"firstAvailableBook\">"
+        }
+        if {[CGIValue lastBook] != ""} {
+            puts "<input type=\"hidden\" name=\"lastBook\"\
+                value=\"[CGIValue lastBook]\">"
+        } else {
+            puts "<input type=\"hidden\" name=\"lastBook\"\
+                value=\"lastAvailableBook\">"
+        }
+        puts "<input type=\"hidden\" name=\"matchWholeWordsOnly\"\
+            value=\"[CGIValue matchWholeWordsOnly]\">\n"
+    }
+
+    puts ""
     if {[shouldPresentChoiceBetweenConcordanceAndPassageLookup]} {
         if {[CGIValue lookupMode] == "passage"} {
             puts -nonewline "<input type=\"radio\" name=\"lookupMode\"\
                 value=\"concordance\"> Concordance\
                 <input type=\"radio\" name=\"lookupMode\" value=\"passage\"\
-                checked> Passage</td></tr>\n"
+                checked> Passage\n"
         } else {
-            puts -nonewline "<tr><td><input type=\"radio\" name=\"lookupMode\"\
+            puts -nonewline "<input type=\"radio\" name=\"lookupMode\"\
                 value=\"concordance\" checked> Concordance\
                 <input type=\"radio\" name=\"lookupMode\" value=\"passage\">
-                Passage</td></tr>\n"
+                Passage\n"
         }
-        puts -nonewline "<tr><td>"
+        puts -nonewline ""
     } else {
         puts -nonewline "<input type=\"hidden\" name=\"lookupMode\" \
             value=\"[CGIValue lookupMode]\">\n"
     }
-    puts -nonewline "</tr></td>\n\
-        </table>"
+    puts -nonewline ""
+    displayPermalink
+}
+
+proc displayURL {} {
+    puts -nonewline [getActionURL]
+    puts -nonewline "?"
+    if {[CGIValue search [CGIValue highlightedWords]] != ""} {
+        set search [CGIValue search [CGIValue highlightedWords]]
+        regsub -all {\s+} $search {+} search
+        if {$search ne ""} {
+            puts -nonewline "passage=$search&"
+        }
+    }
+    if {[CGIValue passage [CGIValue lookup]] != ""} {
+        set passage [CGIValue passage [CGIValue lookup]]
+        regsub -all {\s+} $passage {+} passage
+        if {$passage ne ""} {
+            puts -nonewline "search=$passage&"
+        }
+    }
+    if {[CGIValue firstBook] != ""} {
+        set firstBook [CGIValue firstBook]
+        if {$firstBook ne "firstAvailableBook"} {
+            if {$firstBook ne ""} {
+                puts -nonewline "firstBook=[CGIValue firstBook]&"
+            }
+        }
+    }
+    if {[CGIValue lastBook] != ""} {
+        set lastBook [CGIValue lastBook]
+        if {$lastBook ne "lastAvailableBook"} {
+            if {$lastBook ne ""} {
+                puts -nonewline "lastbook=[CGIValue lastBook]&"
+            }
+        }
+    }
+    if {[CGIValue includeOldTestament] != ""} {
+        puts -nonewline "includeOldTestament=[CGIValue includeOldTestament]&"
+    }
+    if {[CGIValue includeApocrypha] != ""} {
+        puts -nonewline "includeApocrypha=[CGIValue includeApocrypha]&"
+    }
+    if {[CGIValue includeNewTestament] != ""} {
+        puts -nonewline "includeNewTestament=[CGIValue includeNewTestament]&"
+    }
+    if {[CGIValue BibleVersion] != ""} {
+        puts -nonewline "BibleVersion=[CGIValue BibleVersion]&"
+    }
+    if {[CGIValue advancedSearch] != ""} {
+        puts -nonewline "advancedSearch=[CGIValue advancedSearch]&"
+    }
 }
 proc displayStandardChoices {} {
 	#debugLog "dsc"
@@ -1280,16 +1373,38 @@ proc displayStandardChoices {} {
 	#puts -nonewline "<input type=\"submit\" value=\"Go!\"></p>\n"
 }
 
+proc displayVersion {abbreviation} {
+    ###
+    switch $abbreviation {
+        KJV {
+            return "<acronym title=\"King James Version\">KJV</acronym>"
+        }
+        RSV {
+            return "<acronym title=\"Revised Standard Version\">RSV</acronym>"
+        }
+        Uncensored {
+            return "<acronym title=\"The Uncensored Bible\">Uncensored</acronym>"
+        }
+        default {
+            return $abbreviation
+        }
+    }
+}
+
 proc displayVersionChoiceIfAppropriate {} {
+    puts "<span class='advanced_search'>"
+    puts "<br />"
+    puts "<br />"
     foreach currentVersion [getAvailableBibleVersions] {
         puts -nonewline "<input type=\"radio\" name=\"BibleVersion\"\
           value=\"$currentVersion\" "
         if {$currentVersion == [getBibleVersion]} {
             puts -nonewline "checked"
         }
-        puts -nonewline "> $currentVersion&nbsp; "
+        puts -nonewline "> [displayVersion $currentVersion]&nbsp; "
     }
-    #puts -nonewline "</td></tr><tr><td>"
+    puts -nonewline "</span>"
+    #puts -nonewline ""
 }
 
 proc editFolder {identifier} {
@@ -1512,6 +1627,49 @@ proc entrySort {toSort {criterionToSortOn "topicName"}} {
 	[entrySort $greaterOrEqualBin $criterionToSortOn]]
 }
 
+#proc entrySort {toSort {criterionToSortOn "topicName"}} {
+#	global metaData
+#	#debugLog "es"
+#	# Bubble entrySort the results--we should be working with small enough data that
+#	# this is insignificant next to the time taken for i.e. I/O and network
+#	# traffic.
+#	for {set largeIndex 0} {$largeIndex < [expr [llength $toSort] - 1]} {incr \
+#	  largeIndex} {
+#		#Don't start at $largeIndex -- I was trimming the wrong side.
+#		for {set smallIndex 0} {$smallIndex < [expr [llength \
+#		  $toSort] - 1 - $largeIndex]} {incr smallIndex} {
+#			#debugLog "es0.0.1 $largeIndex $smallIndex [lindex $toSort $smallIndex]\
+#			  #[lindex $toSort [expr $smallIndex + 1]]"
+#			switch $criterionToSortOn {
+#				fullPathname {
+#					set currentFieldToCompare [getFullPath [lindex \
+#					  $toSort $smallIndex]]
+#					set nextFieldToCompare [getFullPath [lindex $toSort \
+#					  [expr $smallIndex + 1]]]
+#				}
+#				topicName -
+#				default {
+#					set currentFieldToCompare [getTopicName [lindex \
+#					  $toSort $smallIndex]]
+#					set nextFieldToCompare [getTopicName [lindex $toSort \
+#					  [expr $smallIndex + 1]]]
+#				}
+#			}
+#			#debugLog "es1 $currentFieldToCompare $nextFieldToCompare"
+#			if {[string compare -nocase $currentFieldToCompare \
+#			  $nextFieldToCompare] > 0} {
+#				  #debugLog "es0.1.2 Swapping $current"
+#				set juggle [lindex $toSort $smallIndex]
+#				set toSort [lreplace $toSort $smallIndex $smallIndex \
+#				  [lindex $toSort [expr $smallIndex + 1]]]
+#				set toSort [lreplace $toSort [expr $smallIndex + 1] \
+#				  [expr $smallIndex + 1] $juggle]
+#			}
+#		}
+#	}
+#	return $toSort
+#}
+
 proc entrySortWithParent {parentID {criterionToSortOn "topicName"}} {
 	global metaData
 	#debugLog "eswp"
@@ -1628,64 +1786,62 @@ proc getBibleVersion {} {
 
 proc getCanonicalReference {} {
     #debugLog "getCanonicalReference"
-    set lookup [CGIValue lookup]
-    if {![regexp -- "\[a-zA-Z\]" $lookup]} {
+    set passage [CGIValue passage [CGIValue lookup]]
+    if {![regexp -- "\[a-zA-Z\]" $passage]} {
         return ""
     }
-    set lookup [string tolower $lookup]
+    set passage [string tolower $passage]
     # We may get incomplete behaviour if someone tries to e.g. lookup Psalms
     # 149:3-151:2.
-    if {[regexp -- "^p\[a-zA-Z ]*151:" $lookup]} {
-        regsub {:} $lookup { 1:} lookup
+    if {[regexp -- "^p\[a-zA-Z ]*151:" $passage]} {
+        regsub {:} $passage { 1:} passage
     }
-    regsub -all {\.} $lookup "" lookup
-    set numeric [lindex $lookup [expr [llength $lookup] - 1]]
-    set lookup [lreplace $lookup [expr [llength $lookup] - 1]\
-        [expr [llength $lookup] - 1]]
+    regsub -all {\.} $passage "" passage
+    set numeric [lindex $passage [expr [llength $passage] - 1]]
+    set passage [lreplace $passage [expr [llength $passage] - 1]\
+        [expr [llength $passage] - 1]]
     if {![regexp -- "\[0-9\]" $numeric]} {
-        set lookup "$lookup $numeric"
+        set passage "$passage $numeric"
         set numeric 1
     }
-    regsub -all { } $lookup {\-} lookup
-    regsub {^\-} $lookup {} lookup
-    regsub {^\\\-} $lookup {} lookup
-    switch [string index $lookup 0] {
+    regsub -all { } $passage {\-} passage
+    switch [string index $passage 0] {
         1 {
-            regsub 1 $lookup i lookup
+            regsub 1 $passage i passage
         }
         2 {
-            regsub 2 $lookup ii lookup
+            regsub 2 $passage ii passage
         }
         3 {
-            regsub 3 $lookup iii lookup
+            regsub 3 $passage iii passage
         }
         4 {
-            regsub 4 $lookup iv lookup
+            regsub 4 $passage iv passage
         }
         5 {
-            regsub 5 $lookup v lookup
+            regsub 5 $passage v passage
         }
         6 {
-            regsub 6 $lookup vi lookup
+            regsub 6 $passage vi passage
         }
         7 {
-            regsub 7 $lookup vii lookup
+            regsub 7 $passage vii passage
         }
         8 {
-            regsub 8 $lookup viii lookup
+            regsub 8 $passage viii passage
         }
         9 {
-            regsub 9 $lookup ix lookup
+            regsub 9 $passage ix passage
         }
     }
-    set lookup [removeShellMetacharacters $lookup]
+    set passage [removeShellMetacharacters $passage]
     set numeric [removeShellMetacharacters $numeric]
-    if {[chaptersIn $lookup] == 1 && [regexp -- "^\[0-9\]+$" $numeric] && \
+    if {[chaptersIn $passage] == 1 && [regexp -- "^\[0-9\]+$" $numeric] && \
         $numeric != 1} {
         set numeric "1:$numeric"
     }
-    set lookup "$lookup $numeric"
-    return $lookup
+    set passage "$passage $numeric"
+    return $passage
 }
 
 proc getCellpadding {} {
@@ -1745,7 +1901,7 @@ proc getDefaultAccessMethod {} {
 
 proc getDefaultBibleVersion {} {
     #debugLog "getDefaultVersion"
-    return [getConfigValue "defaultBibleVersion" "RSV"]
+    return [getConfigValue "defaultBibleVersion" "KJV"]
 }
 
 proc getDefaultDisplayMethod {} {
@@ -2395,7 +2551,6 @@ proc init {} {
 	global collapsedObject
 	global configOptions
 	global debugMode
-    global errorMessage
 	global lockedFiles
 	global metaDataRead
 	global metaDataWritten
@@ -2408,9 +2563,7 @@ proc init {} {
 	#set debugMode 0
 	#debugLog "i"
 	#set debugMode 0
-	 debugLog "Starting processing..."
 	set administrativeActionResult ""
-    set errorMessage ""
 	set metaDataRead 0
 	set metaDataWritten 0
 	set collapsedObject ""
@@ -2787,7 +2940,14 @@ proc moveUp {id} {
 proc pageEnd {} {
 	#debugLog "pe"
 	puts "</form>"
-	readFile [concat [getFilePrefix]/general/footer]
+    set documentURL [getConfigValue docucmentURL]
+	#readFile [concat [getFilePrefix]/general/footer]
+    puts -nonewline "<div id=\"quotes\">\n\
+        </div>\n\
+    <script src="$documentURL/bible.js">\n\
+    </script>\n\
+    </body>\n\
+    </html>"
 }
 
 proc pageStart {{preserveLogin 1}} {
@@ -3225,11 +3385,6 @@ proc readTopic {filename} {
 	return $result
 }
 
-proc registerError {version currentErrorMessage} {
-    global errorMessage
-    set errorMessage "$errorMessage$currentErrorMessage"
-}
-
 proc registerQueryData {field value} {
 	global additionalQueryData
 	#debugLog "rqd"
@@ -3642,10 +3797,10 @@ proc showFrames {} {
         puts -nonewline "&BibleVersion="
         puts -nonewline [CGIValue BibleVersion]
     }
-    if {[CGIValue query] != ""} {
-        set query [CGIValue query]
-        regsub -all {\s+} $query {+} query
-        puts -nonewline "&lookup=$query"
+    if {[CGIValue search [CGIValue highlightedWords]] != ""} {
+        set search [CGIValue search [CGIValue highlightedWords]]
+        regsub -all {\s+} $search {+} search
+        puts -nonewline "&search=$search"
         puts -nonewline "&firstBook=firstAvailableBook"
         puts -nonewline "&lastBook=lastAvailableBook"
         puts -nonewline "&includeOldTestament="
@@ -3675,10 +3830,10 @@ proc showFrames {} {
         puts -nonewline "&BibleVersion="
         puts -nonewline [CGIValue BibleVersion]
     }
-    if {[CGIValue passage] != ""} {
-        set passage [CGIValue passage]
+    if {[CGIValue passage [CGIValue lookup]] != ""} {
+        set passage [CGIValue passage [CGIValue lookup]]
         regsub -all {\s+} $passage {+} passage
-        puts -nonewline "&lookup=$passage"
+        puts -nonewline "&passage=$passage"
     }
     puts -nonewline "\" name=\"passage\">\n\
         </frameset>\n"
@@ -4035,8 +4190,8 @@ if {[CGIValue lookupMode] != ""} {
     pageStart
 
     if {[CGIValue lookupMode] == "concordance"} {
-        puts "<h1>The Powered Access Bible:<br><em>Search Engine</em></h1>"
-        puts "<h2>The Holy Bible, [getBibleVersion]</h2>"
+        puts "<h1 class='search'>The Powered Access Bible:<br><em>Search Engine</em></h1>"
+        puts "<h2 class='search'>The Holy Bible, [displayVersion [getBibleVersion]]</h2>"
         displayQueryForm
         set sectionsToSearch {}
         if {[CGIValue includeOldTestament] != ""} {
@@ -4051,7 +4206,8 @@ if {[CGIValue lookupMode] != ""} {
         if {$sectionsToSearch == {}} {
             set sectionsToSearch "--old --new"
         }
-        switch -regexp [CGIValue lookup] {
+
+        switch -regexp [CGIValue search [CGIValue highlightedWords]] {
             {\w} {
                 set evalCommand "exec bin/concordance --cgi --version\
                     [getBibleVersion] $sectionsToSearch --actionURL\
@@ -4060,85 +4216,104 @@ if {[CGIValue lookupMode] != ""} {
                 if {[CGIValue matchWholeWordsOnly] == ""} {
                     set evalCommand "$evalCommand --match-partial-words"
                 }
-                set evalCommand "$evalCommand [CGIValue lookup]"
+                set evalCommand "$evalCommand [CGIValue search [CGIValue highlightedWords]]"
                 set result [eval $evalCommand]
                 if {$result == ""} {
-                    puts -nonewline "<p><span class=\"heading\">Your search\
-                        didn't find any results.</span></p>"
+                    puts -nonewline "<script>\n\
+                        top.location.href='"
+                    displayURL
+                    puts -nonewline "';\n\
+                    </script>"
                 } else {
                     puts $result
+                    displayPermalink
                 }
             }
             default {
             }
         }
-        puts -nonewline "<p align=\"center\">This web tool was created by\
-            <a href=\"http://JonathansCorner.com\">Jonathan Hayward</a> (<a href=\"http://JonathansCorner.com\"\
-            target=\"_top\">home page: Jonathan's Corner</a>; <a\
-            href=\"http://JonathansCorner.com/about/contact/\">contact
-            information</a>).</p>\n"
         puts -nonewline "<p align=\"center\"><a\
-            href=\"[getDocumentURL]/tou.html\" target=\"_top\">Terms of\
+            href=\"[getDocumentURL]/tou.html\" target=\"_blank\">Terms of\
             Use</a></p>"
-    } elseif  {[CGIValue lookupMode] == "passage"} {
-        puts "<h1>The Powered Access Bible:<br><em>Passage Lookup</em></h1>"
-        set reference [getCanonicalReference]
-        set reference [eval "exec bin/concordance --displayable-book-name\
-          $reference"]
-        if {[string length $reference] > 1} {
-            puts "<h2>$reference, [getBibleVersion]</h2>"
-        } else {
-            puts "<h2>The Holy Bible, [getBibleVersion]</h2>"
-        }
-        displayQueryForm
-        displayVersionChoiceIfAppropriate
-        displayChapterNavigationIfAppropriate
-        if {[CGIValue highlightedWords] == ""} {
+        if {[CGIValue search [CGIValue highlightedWords]] == ""} {
             set result [exec "bin/passage" "--version" [getBibleVersion]\
                 "--silent" "--cgi" [getCanonicalReference]]
         } else {
-            set highlightedWords [CGIValue highlightedWords]
-            regsub -all {\s+} $highlightedWords {_} highlightedWords
-            regsub -all {\++} $highlightedWords {_} highlightedWords
+            set search [CGIValue search [CGIValue highlightedWords]]
+            regsub -all {\s+} $search {_} search
+            regsub -all {\++} $search {_} search
             set result [eval "exec bin/passage --version [getBibleVersion]\
-                --silent --cgi --highlighted_words $highlightedWords\
+                --silent --cgi --search $search\
                 [getCanonicalReference]"]
         }
         if {$result != ""} {
             puts $result
         } else {
-            switch -regexp [CGIValue lookup] {
+        puts -nonewline "<p align=\"center\"\
+            style=\"margin-bottom: .5in; padding: 12px; background-color: white\">This web tool was created by\
+            <a href=\"http://JonathansCorner.com\"\
+            target=\"top\">Eastern Orthodox Christian author Jonathan\
+            \"C.J.S.\" Hayward: <em>visit the main theology, literature, and\
+            books site</em>!</a></p>"
+        }
+    } elseif  {[CGIValue lookupMode] == "passage"} {
+        puts "<h1>The Powered Access Bible:<br><em>Passage Lookup</em></h1>"
+
+        set reference [getCanonicalReference]
+        set reference [eval "exec bin/concordance --displayable-book-name\
+          $reference"]
+        if {[string length $reference] > 1} {
+            puts "<h2>$reference, [displayVersion [getBibleVersion]]</h2>"
+        } else {
+            puts "<h2>The Holy Bible, [displayVersion [getBibleVersion]]</h2>"
+        }
+        displayQueryForm
+
+        #displayChapterNavigationIfAppropriate
+        if {[CGIValue search [CGIValue highlightedWords]] == ""} {
+            set result [exec "bin/passage" "--version" [getBibleVersion]\
+                "--silent" "--cgi" [getCanonicalReference]]
+        } else {
+            set search [CGIValue search [CGIValue highlightedWords]]
+            regsub -all {\s+} $search {_} search
+            regsub -all {\++} $search {_} search
+            set result [eval "exec bin/passage --version [getBibleVersion]\
+                --silent --cgi --search $search\
+                [getCanonicalReference]"]
+        }
+        if {$result != ""} {
+            puts $result
+        } else {
+            switch -regexp [CGIValue passage [CGIValue lookup]] {
                 {[\w]} {
-                    puts "<p>I'm sorry, but I couldn't find anything for that\
-                        reference.</p>\n\
-                        <p><strong>Were you trying to do a keyword search? If\
-                        so, please copy and\
-                        paste \"<em>[CGIValue lookup]</em>\" into the\
-                        <em>left</em> search box.</strong> The <em>right</em>
-                        search box lets you look up a passage if you already
-                        know where it is.</p>\n\
-                        <p>If you were trying to look up a specific passage,
-                        try something like 'Deuteronomy\
-                        6:4-9' or 'I Corinthians 13'. You might use\
-                        the full name of the book, and making sure the chapter\
-                        and verses really exist. (You can't read Mark 17\
-                        because there <em>isn't</em> a Mark 17: Mark is only
-                        16 chapters long.)</p>"
-                        
+                    #puts "<p>I'm sorry, but I couldn't find anything for that\
+                        #reference. <strong>Try something like 'Deuteronomy\
+                        #6:4-9' or 'I Corinthians 13'.</strong> You might use\
+                        #the full name of the book, and making sure the chapter\
+                        #and verses really exist. (You can't read Mark 17\
+                        #because there <em>isn't</em> a Mark 17: Mark is only
+                        #16 chapters long.)</p>"
+                    puts -nonewline "<script>\n\
+                        top.location.href='"
+                    displayURL
+                    puts -nonewline "';\n\
+                    </script>"
                 }
             }
         }
+
         displayChapterNavigationIfAppropriate
         puts "<br>"
         puts [exec "bin/concordance" "--version" [getBibleVersion] "--list-books"]
-        puts -nonewline "<p align=\"center\">This web tool was created by\
-            <a href=\"http://JonathansCorner.com\">Jonathan Hayward</a> (<a href=\"http://JonathansCorner.com\"\
-            target=\"_top\">home page: Jonathan's Corner</a>; <a\
-            href=\"http://JonathansCorner.com/about/contact/\">contact
-            information</a>).</p>\n"
         puts -nonewline "<p align=\"center\"><a\
-            href=\"[getDocumentURL]/tou.html\" target=\"_top\">Terms of\
+            href=\"[getDocumentURL]/tou.html\" target=\"_blank\">Terms of\
             Use</a></p>"
+        puts -nonewline "<p align=\"center\"\
+            style=\"margin-bottom: .5in; background-color: navajowhite; padding: 12px\">This web tool was created by\
+            <a href=\"http://JonathansCorner.com\"\
+            target=\"top\">Eastern Orthodox Christian author Jonathan\
+            \"C.J.S.\" Hayward: <em>visit the main theology, literature, and\
+            books site</em>!</a></p>"
     } else {
         displayQueryForm
     }

@@ -93,10 +93,10 @@ includeNewTestamentByDefault yes
 # The current version and release of the Powered Access Bible.
 #
 
-versionNumber 2.0
+versionNumber 1.2R1
 
 #
 # How many columns wide text-related inputs are.  You should set this value
 # so that it will not cause horizontal scrolling on an 800x600 monitor.
 #
-textWidth 20
+textWidth 40

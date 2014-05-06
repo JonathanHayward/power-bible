@@ -137,7 +137,7 @@ sub list_column_of_books
             {
             $url_encoded_book_name = &get_url_encoded_book_name($1);
             $book_name = &get_proper_book_name($1);
-            print "<a href=\"$action_URL?lookupMode=passage&lookup=$url_encoded_book_name+1&highlightedWords=$encoded_words&BibleVersion=$version\" target=\"passage\">$book_name</a><br>\n";
+            print "<a href=\"$action_URL?lookupMode=passage&lookup=$url_encoded_book_name+1&search=$encoded_words&BibleVersion=$version\" target=\"passage\">$book_name</a><br>\n";
             }
         }
     }
@@ -385,7 +385,7 @@ foreach $current_line (@lines)
                 if ($action_URL ne "")
                     {
                     $url_encoded_book_name = &get_url_encoded_book_name ( $1 );
-                    print "<p><span class=\"heading\"><a href=\"$action_URL?lookupMode=passage&lookup=$url_encoded_book_name+$2&highlightedWords=$encoded_words&BibleVersion=$version#$2.$3\" target=\"passage\">$book_name $2:$3</a></span><br>\n";
+                    print "<p><span class=\"heading\"><a href=\"$action_URL?lookupMode=passage&lookup=$url_encoded_book_name+$2&search=$encoded_words&BibleVersion=$version#$2.$3\" target=\"passage\">$book_name $2:$3</a></span><br>\n";
                     }
                 else
                     {
@@ -396,7 +396,8 @@ foreach $current_line (@lines)
                     # Kludge because I don't have Perl reference
                     # materials handy. Sorry this is so ugly. I'm not writing
                     # the exponential time to handle this case-insensitive this
-                    # way. It handles proper, upper, and lower case correctly.
+                    # way. It should handle proper, upper, and lower case
+                    # correctly.
                     $lower = lc($current_word);
                     $proper = $lower;
                     $proper =~ s/^a/A/;
