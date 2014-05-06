@@ -1,0 +1,244 @@
+#!FULL_TCL_PATH
+
+proc debugPrint {message} {
+	global debugMode
+	if {$debugMode} {
+		puts $message
+	}
+}
+proc displayAndSay {text chapter verse} {
+	global debugMode
+    global highlightedWords
+    global shouldProduceHTML
+    global shouldSynthesiseSpeech
+	debugPrint "displayAndSay"
+    if {$shouldProduceHTML} {
+        set modifiedText [removeCitation $text]
+        foreach currentWord $highlightedWords {
+            regsub -all -nocase $currentWord $modifiedText "<span\
+                class=\"highlighted\">$currentWord</span>" modifiedText
+        }
+        puts -nonewline "<p><a\
+            name=\"$chapter.$verse\"></a><span\
+            class=\"verse_reference\">$chapter:$verse</span>\
+            $modifiedText</p>\n\n"
+    } else {
+        puts -nonewline "[format $text]"
+    }
+    puts -nonewline "\n\n"
+    if {$shouldSynthesiseSpeech} {
+        say [removeCitation $text]
+    }
+}
+
+proc format {text} {
+	global debugMode
+	debugPrint "format"
+	return [exec echo "    $text" | fmt]
+}
+
+proc init {} {
+	global argc
+	global argv
+	global chapterToRead
+	global debugMode
+	global firstChapter
+	global firstVerse
+    global highlightedWords
+	global lastChapter
+	global lastVerse
+	global rootDirectory
+	global isPassageDefinedByVerse
+	global sableRateSpeed
+	global sablePitchBase
+	global sablePitchRange
+	global sableVolumeLevel
+    global shouldProduceHTML
+	global shouldReadAllVerses
+	global shouldReadByVerse
+    global shouldSynthesiseSpeech
+	global tmpInfix
+	global verses
+    global version
+	set debugMode 0
+	debugPrint "init"
+    set argv [split [join $argv " "] " "]
+    if {[lindex $argv 0] == "--version" || [lindex $argv 0] == "-v"} {
+        set version [lindex $argv 1]
+        set argv [lreplace $argv 0 1]
+    } else {
+        set version RSV
+    }
+    if {[lindex $argv 0] == "--silent" || [lindex $argv 0] == "-s"} {
+        set shouldSynthesiseSpeech 0
+        set argv [lreplace $argv 0 0]
+    } else {
+        set shouldSynthesiseSpeech 1
+    }
+    if {[lindex $argv 0] == "--cgi" || [lindex $argv 0] == "-c"} {
+        set shouldProduceHTML 1
+        set argv [lreplace $argv 0 0]
+    } else {
+        set shouldProduceHTML 0
+    }
+    if {[lindex $argv 0] == "--highlighted_words" || \
+        [lindex $argv 0] == "-h"} {
+        set argv [lreplace $argv 0 0]
+        set highlightedWords [split [lindex $argv 0] "_"]
+        set argv [lreplace $argv 0 0]
+    } else {
+        set highlightedWords {}
+    }
+
+	if {$argc == 1} {
+		set shouldReadAllVerses 1
+		set isPassageDefinedByVerse 1
+		set lastChapter -1
+	} else {
+		set shouldReadAllVerses 0
+		if {[llength [split [lindex $argv 1] "-"]] > 1} {
+			set citations [split [lindex $argv 1] "-"]
+			set firstChapter [lindex [split [lindex $citations 0] ":"] 0]
+			set firstVerse [lindex [split [lindex $citations 0] ":"] 1]
+			set lastChapter [lindex [split [lindex $citations 1] ":"] 0]
+			set lastVerse [lindex [split [lindex $citations 1] ":"] 1]
+			if {$lastVerse == "" && \
+				$firstVerse != "" && \
+				$lastChapter > $firstVerse} {
+				set lastVerse $lastChapter
+				set lastChapter $firstChapter
+			}
+			set isPassageDefinedByVerse 1
+		} elseif {[llength [split [lindex $argv 1] ":"]] > 1} {
+			set firstChapter [lindex [split [lindex $argv 1] ":"] 0]
+			set firstVerse [lindex [split [lindex $argv 1] ":"] 1]
+			set lastChapter $firstChapter
+			set lastVerse $firstVerse
+			set isPassageDefinedByVerse 1
+		} else {
+			set chapterToRead [lindex $argv 1]
+			set isPassageDefinedByVerse 0
+		}
+	}
+	debugPrint "init isPassageDefinedByVerse $isPassageDefinedByVerse"
+	set rootDirectory "."
+    set files [glob -nocomplain\
+      "$rootDirectory/versions/$version/[lindex $argv 0]*"]
+    if {[llength $files] == 0} {
+        exit 0
+    }
+	set concatenatedVerses [exec cat [lindex $files 0]]
+	set shouldReadByVerse 1
+	set sablePitchBase "-60%"
+	set sablePitchRange "-30%"
+	if {$argc > 2} {
+		if {[llength [split [lindex $argv 2] "%"]] > 1} {
+			set sableRateSpeed "[lindex $argv 2]"
+		} else {
+			set sableRateSpeed "[lindex $argv 2]%"
+		}
+	} else {
+		set sableRateSpeed "-60%"
+	}
+	if {$argc > 3} {
+		if {[llength [split [lindex $argv 3] "%"]] > 1} {
+			set sableVolumeLevel "[lindex $argv 3]"
+		} else {
+			set sableVolumeLevel "[lindex $argv 3]%"
+		}
+	} else {
+		set sableVolumeLevel "+100%"
+	}
+	set tmpInfix [clock clicks]
+	set verses [split $concatenatedVerses "\n"]
+}
+
+proc main {} {
+	global chapterToRead
+	global debugMode
+	global firstChapter
+	global firstVerse
+	global isPassageDefinedByVerse
+	global lastChapter
+	global lastVerse
+	global shouldReadAllVerses
+	global shouldReadByVerse
+	global verses
+	debugPrint "main"
+	puts ""
+	set shouldPrint 0
+	foreach currentVerse $verses {
+		set reference [lindex [split $currentVerse " "] 0]
+		set splitForReference [split $reference ":"]
+        set chapter [lindex $splitForReference 0]
+        set verse [lindex $splitForReference 1]
+		if {$shouldReadAllVerses} {
+			set shouldPrint 1
+		} else {
+			if {$isPassageDefinedByVerse} {
+				debugPrint "$firstChapter:$firstVerse $chapter:$verse"
+				if {$chapter == $firstChapter && \
+					($verse == $firstVerse ||\
+					$firstVerse == "")} {
+					set shouldPrint 1
+				}
+				if {$chapter > $lastChapter} {
+					set shouldPrint 0
+				}
+			} else {
+				if {$chapter == $chapterToRead} {
+					set shouldPrint 1
+				} else {
+					set shouldPrint 0
+				}
+			}
+		}
+		if {$shouldPrint} {
+			displayAndSay $currentVerse $chapter $verse
+		}
+		if {$isPassageDefinedByVerse} {
+			if {$chapter == $lastChapter && \
+				$verse == $lastVerse} {
+				set shouldPrint 0
+			}
+		}
+	}
+}
+
+proc removeCitation {verse} {
+	global debugMode
+	debugPrint "removeCitation"
+	regsub -all {\d+:\d+:} $verse {} result
+	regsub -all {\d+:\d+ } $result {} result
+	return $result
+}
+
+proc say {text} {
+	global debugMode
+	global rootDirectory
+	global sablePitchBase
+	global sablePitchRange
+	global sableRateSpeed
+	global sableVolumeLevel
+	global tmpInfix
+	debugPrint "say"
+	set sable "[exec cat $rootDirectory/sableheader]"
+	regsub -all "@PITCH_BASE@" $sable $sablePitchBase sable
+	regsub -all "@PITCH_RANGE@" $sable $sablePitchRange sable
+	regsub -all "@RATE_SPEED@" $sable $sableRateSpeed sable
+	regsub -all "@VOLUME_LEVEL@" $sable $sableVolumeLevel sable
+	set sable "$sable$text"
+	set sable "$sable[exec cat $rootDirectory/sablefooter]"
+	if { [catch {open "/tmp/read.$tmpInfix.sable" w} fileId] } {
+		puts "Unable to write:\n\n[format $text]\n\nto give to the\
+			synthesiser.  Continuing..."
+	} else {
+		puts $fileId $sable
+		close $fileId
+		exec festival --tts "/tmp/read.$tmpInfix.sable"
+		file delete "/tmp/read.$tmpInfix.sable"
+	}
+}
+
+init
+main

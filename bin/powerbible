@@ -1,0 +1,4100 @@
+#!FULL_TCL_PATH
+
+#
+# The Powered Access Bible is (c) 2001-3 by Jonathan Hayward, released under
+# the Artistic License, and comes with no warranty. Please visit my homepage at
+# http://JonathansCorner.com to see what else I've created--not just software.
+#
+# I'd like to thank the following people for helping me debug or otherwise
+# get this program in working order:
+#	Waidelich Burkhard
+#	Stuart Cassoff, who furnished the configuration file code
+#	Bruce Hartweg
+#	Jeff Hobbs
+#	Cameron Laird
+#	Mick O'Donnell
+#	George Schlitz
+#
+#	Mike Doyle, for introducing me to Tcl and giving me several good Tcl
+#	books to start hacking with.
+#
+#	and various other people from comp.lang.Tcl whose names I didn't get down.
+#
+# Thanks also to Kapocs Web Design, kapocs.hypermart.net, and HSD2 Tech
+# Support, www.harrison.k12.co.us, for providing attractive backgrounds for
+# free download--including the one I used.
+#
+
+set configFilename "CONFIG_FILENAME"
+
+#
+# Utility routines.  Many of these have been provided by other programmers.
+#
+
+proc CGIKeys {} {
+	set scratch [CGIList]
+	set toggle 1
+	foreach entry $scratch {
+		if {$toggle} {
+			lappend result $entry
+			set toggle 0
+		} else {
+			set toggle 1
+		}
+	}
+	return $result
+}
+
+#Cosmetically adapted from Brent B. Welch, _Practical Programming in Tcl and
+#Tk_
+proc CGIList {} {
+	set query [CGIQuery]
+	regsub -all {\+} $query { } query
+	set result {}
+	foreach {x} [split $query &=] {
+		lappend result [URLDecode $x]
+	}
+	return $result
+}
+
+#Cosmetically adapted from Brent B. Welch, _Practical Programming in Tcl and
+#Tk_
+#
+# Modified by Jonathan Hayward 8/24/02 so that later values overwrite earlier
+# ones.
+#
+proc CGIParse {} {
+	global cgi cgilist
+	catch {unset cgi cgilist}
+	set query [CGIQuery]
+	regsub -all {\+} $query { } query
+	foreach {name value} [split $query &=] {
+		set name [URLDecode $name]
+#		if {[info exists cgilist($name)] &&
+#				($cgilist($name) == 1)} {
+#			set cgi($name) [list $cgi($name) \
+#				[URLDecode $value]]
+#		} elseif {[info exists cgi($name)]} {
+#			lappend cgi($name) [URLDecode $value]
+#		} else {
+			set cgi($name) [URLDecode $value]
+			set cgilist($name) 0
+#		}
+		incr cgilist($name)
+	}
+	return [array names cgi]
+}
+
+#Adapted from Brent B. Welch, _Practical Programming in Tcl and Tk_
+proc CGIValue {key} {
+	global cgi
+	if {[info exists cgi($key)]} {
+		if {[mightBeUsedInFilename $key]} {
+			return [sanitizePotentialFilenameElement $cgi($key)]
+		} else {
+			return $cgi($key)
+		}
+	} else {
+		return {}
+	}
+}
+
+#Cosmetically adapted from Brent B. Welch, _Practical Programming in Tcl and
+#Tk_
+proc CGILength {key} {
+	global cgilist
+	if {[info exist cgilist($key)]} {
+		return $cgilist($key)
+	} else {
+		return 0
+	}
+}
+
+proc CGIExists {key} {
+	global cgi
+	return [info exists cgi($key)]
+}
+
+#Cosmetically adapted from Brent B. Welch, _Practical Programming in Tcl and
+#Tk_
+proc CGIQuery {} {
+	global env
+	if {![info exists env(QUERY_STRING)] ||
+			[string length $env(QUERY_STRING)] == 0} {
+		if {[info exists env(CONTENT_LENGTH)] &&
+				[string length $env(CONTENT_LENGTH)] != 0} {
+			set query [read stdin $env(CONTENT_LENGTH)]
+		} else {
+			gets stdin query
+		}
+		set env(QUERY_STRING) $query
+		set env(CONTENT_LENGTH) 0
+	}
+	return $env(QUERY_STRING)
+}
+
+#Cosmetically adapted from Brent B. Welch, _Practical Programming in Tcl and
+#Tk_
+proc URLDecode {url} {
+	regsub -all {\+} $url { } url
+	regsub -all {%([[:xdigit:]]{2})} $url \
+		{[format %c 0x\1]} url
+	return [subst $url]
+}
+
+#Slightly adapted from procedures e-mailed by Stuart Cassoff.
+proc loadConfigFile {cfg_file} {
+	 global configOptions configResult
+     if {[catch {set f [open $cfg_file r]}]} {
+	return 0
+     }
+     set buf {}
+     set bad_buf {0}
+     set keep_reading {1}
+     set ok {0}
+     while {1} {
+	# Read in a chunk of data if there is any more to read
+	if {$keep_reading} {
+	    # Try to read more data into buf
+	    if {[eof $f] || [catch {append buf [read $f 130]}]} {
+		# Problem or eof
+		# Stop reading, work with whatever we have
+		set keep_reading 0
+		# No reason to keep the file open at this point
+		catch {close $f}
+	    }
+	}
+	# How much data in buffer?
+	set buf_len [string length $buf]
+	# Done if no data
+	if {$buf_len == 0} {
+	    break
+	}
+	# Find newline
+	set nl_pos [string first "\n" $buf]
+	# No newline in buffer
+	if {$nl_pos == -1} {
+		# Following zero, one, infinity rule, I (Jonathan, Snippets/Sidebar) am
+		# turning this off.
+		set limitBufferLength 0
+	    # Limit buffer size
+	    # No newlines at this point means line too long
+	    # or not proper config file.
+	    # This will prevent using all memory
+	    # if fed a gigantic file
+	    if {($buf_len > 250) && ($limitBufferLength)} {
+		# Clear buffer
+		set buf {}
+		incr bad_buf
+		if {$bad_buf > 2} {
+		    # 3 strikes yer out!
+		    # At this point it is probably safe to
+		    # assume that this is not a proper config file
+		    set ok 0
+		    break
+		}
+	    }
+	    # Maybe newline coming soon if there is
+	    # still more data to read
+	    if {$keep_reading} {
+		continue
+	    }
+	    # Hit eof or problem,
+	    # buf has data but no newline
+	    # Add newline and adjust nl_pos
+	    append buf "\n"
+	    set nl_pos [incr buf_len]
+	}
+	# Get line, discard (skip over) newline
+	# Get trim(line) from buffer
+	incr nl_pos -1
+	set line [string trim [string range $buf 0 $nl_pos]]
+	# Remove line from buffer
+	incr nl_pos 2
+	set buf [string range $buf $nl_pos end]
+	# Skip empty or comment lines
+	if {[string length $line] == 0 || [string equal [string index $line 0] "\#"]} {
+	    continue
+	}
+	# Does this correspond to a valid option?
+	set opt_name [lindex $line 0]
+	set opt_pos [lsearch -exact $configOptions $opt_name]
+	if {$opt_pos == -1} {
+	    continue
+	}
+	# Set option
+	set configResult($opt_name) [lindex $line 1]
+	set ok 1
+     }
+     # May have already closed file
+     if {$keep_reading} {
+	catch {close $f}
+     }
+     return $ok
+}
+
+#Slightly adapted from procedures e-mailed by Stuart Cassoff.
+#Not kept up to date with changes to other variable.
+proc saveConfigFile {cfg_file cfg_arr {head {}} {foot {}}} {
+	 global configOptions
+     upvar \#0 $cfg_arr ca
+     append cfg_data $head
+     foreach opt $configOptions {
+	append cfg_data [list $opt $ca($opt)] "\n"
+     }
+     append cfg_data $foot
+     if {[catch {
+	set f [open $cfg_file w]
+	puts $f $cfg_data
+	flush $f
+	close $f
+     } err]} {
+	catch {close $f}
+	return 0
+     }
+     return 1
+}
+
+#
+# The routines below, and the main body, are more specific to Snippets/Sidebar.
+#
+
+proc accessError {} {
+	#debugLog "ae"
+	puts -nonewline "<p>There's been an error.  The program that's making\n\
+		these pages thinks you're trying to use it differently from how it's\n\
+		set up.  You might tell the administrator what you were trying to\n\
+		do, so that it can be fixed.</p>\n\
+		\n\
+		<p>Sorry!</p>\n"
+	pageEnd
+	# If I set an exit status of one, will that generate an internal server
+	# error?
+	exit 0
+}
+
+proc addTemplates {} {
+	global metaData
+	#debugLog "at"
+	if {[CGIValue shouldAddTemplates] == "yes"} {
+		readMetaData 1
+		set previous [CGIValue previousPageMode]
+		foreach key [CGIKeys] {
+			switch -regexp $key {
+				{^importtemplate_(.*)$} {
+					regexp {^(.*?)_(.*)$} $key match prefix id
+					set templateMetaData [readUserMetaData template]
+					foreach current $templateMetaData {
+						array set currentRow $current
+						if {$currentRow(identifier) == $id} {
+							lappend metaData $current
+							getLock "[getFilePrefix]/users/[getUserName]/$id"
+							file copy "[getFilePrefix]/users/template/$id"\
+								"[getFilePrefix]/users/[getUserName]/$id"
+							releaseLock\
+								"[getFilePrefix]/users/[getUserName]/$id"
+						}
+					}
+				}
+			}
+		}
+		writeMetaData
+	}
+}
+
+# Could be race conditions if two people try to create the same account name
+# at the same time.
+proc addUser {login password passwordDuplicate} {
+	global passwords
+	#debugLog "au"
+	set loginValid 1
+	set errorMessage ""
+	getLock [getPasswordFilename]
+	readPasswords
+	# Make any e-mail validitiy checks
+	if {$login != ""} {
+		set index 0
+		set shouldContinue 1
+		while {$shouldContinue} {
+			array set currentRow [lindex $passwords $index]
+			if {$index >= [llength $passwords]} {
+				set shouldContinue 0
+			} else {
+				if {$currentRow(login) == $login} {
+					set loginValid 0
+					releaseLock [getPasswordFilename]
+					return 0
+				}
+			}
+			incr index
+		if {$password != $passwordDuplicate} {
+			set loginValid 0
+			releaseLock [getPasswordFilename]
+			return 0
+		}
+	}
+	if {$loginValid} {
+		set newLogin(login) $login
+		set newLogin(password) $password
+		if {[getProgramMode] == "MagicNotebook"} {
+			set newLogin(flags) "concise editlink"
+		} else {
+			set newLogin(flags) ""
+		}
+		set newLogin(parent) ""
+		lappend passwords [array get newLogin]
+		writePasswords
+		file mkdir "[getFilePrefix]/users/$login"
+		if { [catch {open "[getFilePrefix]/users/$login/metadata" w} \
+			fileId] } {
+			logMessage "Couldn't open file\
+				[getFilePrefix]/users/$login/metadata.  Exiting from\
+				createLogin..."
+			panic
+		} else {
+			puts -nonewline $fileId ""
+			close $fileId
+		}
+		}
+	}
+	releaseLock [getPasswordFilename]
+	return 1
+}
+
+proc authenticate {} {
+	#debugLog "a"
+    if {[getProgramMode] == "concordance"} {
+        return 1
+    }
+	if {[authenticateInternal [CGIValue login] [CGIValue password]]} {
+		return 1
+	}
+	if {[authenticateInternal [CGIValue login] [CGIValue changePasswordNew]]} {
+		return 1
+	}
+	return 0
+}
+
+proc authenticateInternal {login password} {
+	global passwords
+	global userNotifiedOfLock
+	readPasswords
+	set index 0
+	set shouldContinue 1
+	if {(([shouldAllowGuestAccess] && $login == "guest") ||\
+		(([getProgramMode] == "sidebar") && [shouldAllowSidebarAccess] &&\
+		![CGIExists administrative]) ||\
+		([shouldAllowWikiAccess] && $login == "wiki"))} {
+		return 1
+	}
+	while {$shouldContinue} {
+		array set currentRow [lindex $passwords $index]
+		if {$index >= [llength $passwords]} {
+			set shouldContinue 0
+		} else {
+			if {($currentRow(login) == $login) && ($currentRow(password) ==\
+				$password)} {
+				if {![testUserFlag $login "locked"]} {
+					return 1
+				} else {
+					if {!($userNotifiedOfLock)} {
+						set userNotifiedOfLock 1
+						puts -nonewline "<h1>This account has been\
+							locked.</h1>\
+							\n\
+							\n<p><strong>Please <a\
+							href=\"mailto:[getServerAdminEmail]\">contact the\
+							administrator</a> if you are unsure why this\
+							account may be locked.</strong></p>\
+							\n<hr>\n"
+					}
+					return 0
+				}
+			}
+		}
+		incr index
+	}
+	return 0
+}
+
+proc changePassword {userId password duplicate} {
+	global passwords
+	#debugLog "cp"
+	getLock [getPasswordFilename]
+	readPasswords
+	if {[userExists $userId]} {
+		if {$password == $duplicate} {
+			set index 0
+			set shouldContinue 1
+			while {$shouldContinue} {
+				array set currentRow [lindex $passwords $index]
+				if {$index >= [llength $passwords]} {
+					set shouldContinue 0
+				} else {
+					if {$currentRow(login) == $userId} {
+						set currentRow(password) $password
+						set passwords [lreplace $passwords $index $index\
+							[array get currentRow]]
+						writePasswords
+						releaseLock [getPasswordFilename]
+						return 1
+					}
+				}
+				incr index
+			}
+		} else {
+			releaseLock [getPasswordFilename]
+			return 0
+		}
+	} else {
+		releaseLock [getPasswordFilename]
+		return 0
+	}
+}
+
+proc chaptersIn {book} {
+    set files [glob "versions/[getBibleVersion]/$book*"]
+    return [exec tail -1 [lindex $files 0] | cut -f1 -d:]
+}
+
+proc clearFlag {target flag} {
+	#debugLog "cf"
+	if {[regexp -- "$flag" "$target"]} {
+		regsub -all $flag $target {} target
+		regsub -all {\s+} $target { } target
+	}
+	return $target
+}
+
+proc clearUserFlag {userId flag} {
+	global passwords
+	#debugLog "cuf"
+	if {[userExists $userId]} {
+		set index 0
+		set shouldContinue 1
+		while {$shouldContinue} {
+			array set currentRow [lindex $passwords $index]
+			if {$index >= [llength $passwords]} {
+				set shouldContinue 0
+			} else {
+				if {$currentRow(login) == $userId} {
+					set currentRow(flags) [clearFlag "$currentRow(flags)"\
+						"$flag"]
+					set passwords [lreplace $passwords $index $index [array\
+						get currentRow]]
+					writePasswords
+					return 1
+				}
+			}
+			incr index
+		}
+	}
+	return 0
+}
+
+proc collapse {id} {
+	global metaData
+	#debugLog "c"
+	readMetaData
+	for {set index 0} {$index < [llength $metaData]} {incr index} {
+		array set current [lindex $metaData $index]
+		if {$current(identifier) == $id} {
+			set current(flags) [clearFlag "$current(flags)" "expand"]
+			set metaData [lreplace $metaData $index $index [array get current]]
+		}
+	}
+	writeMetaData
+}
+
+proc collapseAllSiblingsOfAncestors {id} {
+	global metaData
+	#debugLog "collapseAllSiblingsOfAncestors"
+	readMetaData
+	set parent [getParent $id]
+	for {set index 0} {$index < [llength $metaData]} {incr index} {
+		array set current [lindex $metaData $index]
+		if {$current(parent) == $parent} {
+			if {$current(identifier) != $id} {
+				collapse $current(identifier)
+			}
+		}
+	}
+	# Recursive step.
+	if {$parent != "top"} {
+		collapseAllSiblingsOfAncestors $parent
+	}
+}
+
+# This could have race conditions if two people use the same account and try
+# to make new folders at the same [clock clicks].
+proc createFolder {{parent top}} {
+	global metaData
+	#debugLog "cf2"
+	#readMetaData
+	#puts "in createFolder"
+	set prefix "[getProgramMode]"
+	set extension ""
+	set newFolder(identifier) "$prefix[clock seconds][expr abs([clock\
+		clicks])]$extension"
+	#puts "$prefix[clock seconds][clock clicks]$extension"
+	#puts $newFolder(identifier)
+	set newFolder(title) ""
+	set newFolder(header) ""
+	set newFolder(flags) "show expand folder"
+	if {[getProgramMode] == "MagicNotebook"} {
+		set newFolder(parent) "$parent"
+	} else {
+		set newFolder(parent) ""
+	}
+	lappend metaData [array get newFolder]
+	#set fullFilename "[getFilePrefix]/users/[getUserName]/$newFolder(identifier)"
+	#puts $fullFilename
+	#puts $newFolder(identifier)
+	writeMetaData 1
+	#if { [catch {open $fullFilename w} fileId] } {
+		#logMessage "Couldn't open file $fullFilename. Exiting from createTopic..."
+		#panic
+	#} else {
+		#puts $fileId "\"\""
+		#close $fileId
+	#}
+	if {[testUserFlag [getUserName] "concise"]} {
+		collapseAllSiblingsOfAncestors $newFolder(identifier)
+	}
+	selectTopic $newFolder(identifier)
+	writeMetaData 1
+	return $newFolder(identifier)
+}
+
+# This could have race conditions if two people try to make the same account
+# at the same time.
+proc createLogin {} {
+	global passwords
+	#debugLog "cl"
+	getLock [getPasswordFilename]
+	readPasswords
+	set login [CGIValue newLogin]
+	set password [CGIValue password]
+	set passwordDuplicate [CGIValue passwordDuplicate]
+	if {[shouldAllowLoginCreation]} {
+		set loginValid 1
+		set errorMessage ""
+		# Make any e-mail validitiy checks that are desired--checking address
+		# to have valid format.
+		if {$login != ""} {
+			set index 0
+			set shouldContinue 1
+			while {$shouldContinue} {
+				array set currentRow [lindex $passwords $index]
+				if {$index >= [llength $passwords]} {
+					set shouldContinue 0
+				} else {
+					if {$currentRow(login) == $login} {
+						set loginValid 0
+						puts -nonewline "<p>Your e-mail address is already\
+							registered.  Select \"Help! I forgot my\
+							password.\" to have your password e-mailed\
+							to you.</p>\n\
+							<p><input type=\"radio\"\
+							name=\"pageMode\" value=\"forgotPassword\"\
+							onclick=\"document.[getProgramMode].submit()\"\
+							checked> Help! I forgot my password.</p>\n\
+							<p><input type=\"image\" name=\"Go!\"\ border=\"0\"
+							src=\"[getDocumentURL]/submit.jpg\">\n</p>"
+							#<input type=\"submit\" value=\"Go!\">\n"
+						pageEnd
+						releaseLock [getPasswordFilename]
+						exit 0
+					}
+				}
+				incr index
+			if {$password != $passwordDuplicate} {
+				set loginValid 0
+				puts -nonewline "<p>Passwords do not match.  Please make\
+					sure that you type the exact same password, exactly the\
+					same way, both times.</p>\n"
+				displayCreateLogin
+				pageEnd
+				releaseLock [getPasswordFilename]
+				exit 0
+			}
+		}
+		if {$loginValid} {
+			set newLogin(login) $login
+			set newLogin(password) $password
+			set newLogin(flags) ""
+			set newLogin(parent) ""
+			lappend passwords [array get newLogin]
+			writePasswords
+			file mkdir "[getFilePrefix]/users/$login"
+			if { [catch {open "[getFilePrefix]/users/$login/metadata" w} \
+				fileId] } {
+				logMessage "Couldn't open file\
+					[getFilePrefix]/users/$login/metadata.  Exiting from\
+					createLogin..."
+				panic
+			} else {
+				puts -nonewline $fileId ""
+				close $fileId
+			}
+			welcomeScreen $login $password
+			pageEnd
+			releaseLock [getPasswordFilename]
+			exit 0
+			}
+		}
+	}
+	puts -nonewline "<p>This server is not presently set up to create\
+		logins.</p>\n\
+		<input type=\"hidden\" name=\"pageMode\" value=\"entryMenu\">\n\
+		<p><input type=\"image\" name=\"Return to main menu\"\ border=\"0\"
+		src=\"[getDocumentURL]/return_to_the_main_menu.jpg\"></p>" 
+		#<p><input type=\"submit\" value=\"Return to main menu\"></p>" 
+	registerQueryData "pageMode" "entryMenu"
+	pageEnd
+	releaseLock [getPasswordFilename]
+	exit 0
+}
+
+# This could have race conditions if two people use the same account and try
+# to make new topics at the same [clock clicks].
+proc createTopic {{parent top}} {
+	#debugLog "ct"
+	global metaData
+	#readMetaData
+	#puts "in createTopic"
+	set prefix "[getProgramMode]"
+	set extension ""
+	set newTopic(identifier) "$prefix[clock seconds][expr abs([clock\
+		clicks])]$extension"
+	#puts "$prefix[clock seconds][clock clicks]$extension"
+	#puts $newTopic(identifier)
+	set newTopic(title) ""
+	set newTopic(header) ""
+	set newTopic(flags) "show"
+	if {[getProgramMode] == "MagicNotebook"} {
+		set newTopic(flags) "$newTopic(flags) selected expand"
+		set newTopic(parent) "$parent"
+	} else {
+		set newTopic(parent) ""
+	}
+	lappend metaData [array get newTopic]
+	set fullFilename "[getFilePrefix]/users/[getUserName]/$newTopic(identifier)"
+	#puts $fullFilename
+	#puts $newTopic(identifier)
+	writeMetaData 1
+	selectTopic $newTopic(identifier)
+	if { [catch {open $fullFilename w} fileId] } {
+		logMessage "Couldn't open file $fullFilename. Exiting from createTopic..."
+		panic
+	} else {
+		puts $fileId "\"\""
+		close $fileId
+	}
+	if {[testUserFlag [getUserName] "concise"]} {
+		collapseAllSiblingsOfAncestors $newTopic(identifier)
+	}
+	writeMetaData 1
+	return $newTopic(identifier)
+}
+
+proc debugLog {message} {
+	global debugMode
+	if {$debugMode} {
+		logMessage $message
+	}
+}
+
+proc deleteFolder {identifier} {
+	global metaData
+	#debugLog "deleteFolder"
+	if {[isFolder $identifier]} {
+		foreach current $metaData {
+			array set currentRow $current
+			if {$currentRow(parent) == $identifier} {
+				if {[isFolder $currentRow(identifier)]} {
+					deleteFolder $currentRow(identifier)
+				}
+				if {[isTopic $currentRow(identifier)]} {
+					deleteTopic $currentRow(identifier)
+				}
+			}
+		}
+		deleteMetaData $identifier
+	} else {
+		#debugLog "deleteFolder called on an identifier which was not a folder."
+	}
+}
+
+proc deleteMetaData {identifier} {
+	global metaData
+	for {set index 0} {$index < [llength $metaData]} {incr index} {
+		array set currentRow [lindex $metaData $index]
+		if {$currentRow(identifier) == $identifier} {
+			set metaData [lreplace $metaData $index $index]
+		}
+	}
+	writeMetaData 1
+}
+
+proc deleteTopic {identifier} {
+	#debugLog "deleteTopic"
+	if {[isTopic $identifier]} {
+		file delete "[getFilePrefix]/users/[getUserName]/$identifier"
+		deleteMetaData $identifier
+	} else {
+		#debugLog "deleteTopic called on an identifier which was not a topic."
+	}
+}
+
+proc deleteUser {userId} {
+	global passwords
+	global administrativeActionResult
+	#debugLog "du"
+	getLock [getPasswordFilename]
+	readPasswords
+	if {[userExists $userId]} {
+		set index 0
+		set shouldContinue 1
+		while {$shouldContinue} {
+			array set currentRow [lindex $passwords $index]
+			if {$index >= [llength $passwords]} {
+				set shouldContinue 0
+			} else {
+				if {$currentRow(login) == $userId} {
+					set passwords [lreplace $passwords $index $index]
+				}
+			}
+			incr index
+		}
+		writePasswords
+		foreach filename [glob [getFilePrefix]/users/$userId] {
+			file delete -force $filename
+		}
+		file delete -force "[getFilePrefix]/users/$userId"
+		set administrativeActionResult "<p>User <em>$userId</em> successfully\
+			deleted.</p>\n"
+	} else {
+		set administrativeActionResult "<p>Error: user <em>$userId</em> does\
+			not exist and therefore could not be deleted.</p>\n"
+	}
+	releaseLock [getPasswordFilename]
+}
+
+proc deregisterLock {filename} {
+	global lockedFiles
+	#debugLog "dl"
+	while {[lsearch -exact $lockedFiles $filename] != -1} {
+		set index [lsearch -exact $lockedFiles $filename]
+		set lockedFiles [lreplace $lockedFiles $index $index]
+	}
+}
+
+proc displayChapterNavigationIfAppropriate {} {
+    switch -regexp [getCanonicalReference] {
+        {^[\w\-]+ \d+$} {
+            set referenceParts [split [getCanonicalReference] " "]
+            set book [lindex $referenceParts 0]
+            set files [glob "versions/[getBibleVersion]/$book*"]
+            if {[llength $files] == 0} {
+                return
+            }
+            set chapter [lindex [split [lindex $referenceParts 1 ] ":"] 0]
+            set length [chaptersIn $book]
+            displayChapterNavigationInternal $book $chapter $length
+        }
+    }
+}
+
+proc displayChapterNavigationInternal {book chapter length} {
+    puts -nonewline "<p align=\"center\">"
+    if {$chapter > 1} {
+        puts "<a href=\"[getActionURL]?lookupMode=passage&lookup=$book+[expr\
+            $chapter - 1]&highlightedWords=[CGIValue\
+            highlightedWords]&BibleVersion=[getBibleVersion]\"\
+            >Previous Chapter</a>"
+    } else {
+        puts -nonewline "Previous Chapter"
+    }
+    puts -nonewline " | "
+    if {$chapter < $length} {
+        puts "<a href=\"[getActionURL]?lookupMode=passage&lookup=$book+[expr\
+            $chapter + 1]&highlightedWords=[CGIValue\
+            highlightedWords]&BibleVersion=[getBibleVersion]\"\
+            >Next Chapter</a>"
+    } else {
+        puts -nonewline "Next Chapter"
+    }
+    puts -nonewline "</p>\n"
+}
+proc displayCreateLogin {} {
+	#debugLog "dcl"
+	puts -nonewline "<p>E-mail address:<br>\n\
+		<input type=\"text\" name=\"newLogin\"\
+		size=\"[getTextWidth]\"></p>\n\
+		<p>Password:<br>\n\
+		<input type=\"password\" name=\"password\"\
+		size=\"[getTextWidth]\"></p>\n\
+		<p>Repeat password:<br>\n\
+		<input type=\"password\" name=\"passwordDuplicate\"\
+		size=\"[getTextWidth]\"></p>\n\
+		<p>We need your e-mail address so we can send you your\
+		password if it is ever lost.  (What's the\
+		<a href=\"[getDocumentURL]/privacy.html\"\
+		target=\"_blank\">privacy policy</a> about\
+		this?)</p>\n\
+		<p>Children under 13 must get their parents'\
+		permission to set up an account (this is legally\
+		required in the U.S., where this software was written).</p>\n\
+		<input type=\"hidden\" name=\"pageMode\"\
+		value=\"createLogin\">\n\
+		<p><input type=\"image\" name=\"Go!\"\ border=\"0\"
+		src=\"[getDocumentURL]/submit.jpg\"></p>\n"
+		#<input type=\"submit\" value=\"Go!\">\n"
+		registerQueryData "pageMode" "createLogin"
+}
+
+# Question: should the cellspacing and cellpadding be adjusted/decreased?
+proc displayForParent {parentName {htmlPrefix ""}} {
+	#debugLog "dfp"
+	foreach field [entrySortWithParent $parentName] {
+		if {[testMetaDataFlag $field "show"] || \
+		  [getPageMode] == "metaSnippets"} {
+			puts "$htmlPrefix<table border=\"0\" cellspacing=\"0\"\
+			  cellpadding=\"3\">\n<tr>\n"
+			if {[getPageMode] == "snippets" || [getPageMode] == "connect"} {
+				puts "$htmlPrefix<td>"
+				if {[testMetaDataFlag $field "expand"]} {
+					puts -nonewline "$htmlPrefix[getCollapseLinkBeginning\
+					  $field]"
+					if {[testMetaDataFlag $field "folder"]} {
+						puts "<img src=\"[getOpenFolderIconFilename]\"\
+						  border=\"0\" alt=\"\"></a>"
+					} else {
+						puts "<img src=\"[getOpenTopicIconFilename]\"\
+						  border=\"0\" alt=\"\"></a>"
+					}
+				} else {
+					puts -nonewline "$htmlPrefix[getExpandLinkBeginning\
+					  $field]"
+					if {[testMetaDataFlag $field "folder"]} {
+						puts "<img src=\"[getClosedFolderIconFilename]\"\
+						  border=\"0\" alt=\"\"></a>"
+					} else {
+						puts "<img src=\"[getClosedTopicIconFilename]\"\
+						  border=\"0\" alt=\"\"></a>"
+					}
+				}
+				puts "$htmlPrefix</td><td>"
+				if {[testUserFlag [getUserName] "editlink"]} {
+					puts -nonewline "$htmlPrefix[getEditLinkBeginning\
+					  $field]"
+				} else {
+					if {[testMetaDataFlag $field "expand"]} {
+						puts -nonewline\
+						  "$htmlPrefix[getCollapseLinkBeginning $field]"
+					} else {
+						puts -nonewline\
+						  "$htmlPrefix[getExpandLinkBeginning $field]"
+					}
+				}
+			} else {
+				puts "$htmlPrefix<td>"
+				puts -nonewline "$htmlPrefix[getEditLinkBeginning $field]"
+			}
+			puts "$htmlPrefix[getOpenTopicNameTag][getTopicName $field][getCloseTopicNameTag]</a></td></tr>"
+			if {[testMetaDataFlag $field "expand"] || [getPageMode] ==
+			"metaSnippets"} {
+				puts "$htmlPrefix<tr><td><img src=\"[getShadowIconFilename]\"\
+				  border=\"0\"></td>"
+				if {[testMetaDataFlag $field "expand"] || \
+				  [getPageMode] == "metaSnippets"} {
+					if {[testMetaDataFlag $field "folder"]} {
+						puts -nonewline "$htmlPrefix<td>"
+						displayForParent $field "	$htmlPrefix"
+						puts -nonewline "</td>"
+					} else {
+						if {[getPageMode] != "metaSnippets" && \
+						  [getPageMode] != "metaSnippetsAction"} {
+							puts -nonewline "$htmlPrefix<td>"
+							printHeader $field
+							printSnippet $field
+							puts -nonewline "</td>"
+						}
+					}
+				}
+				puts "$htmlPrefix</tr>"
+				}
+			puts "$htmlPrefix</table>"
+		}
+	}
+}
+
+proc displayLogin {} {
+	#debugLog "dl2"
+	puts -nonewline "<p>E-mail address:<br>\n\
+		<input type=\"text\" name=\"login\"\
+		size=\"[getTextWidth]\"></p>\n\
+		<p>Password:<br>\n\
+		<input type=\"password\" name=\"password\"\
+		size=\"[getTextWidth]\"></p>\n\
+		<input type=\"hidden\" name=\"pageMode\"\
+		value=\"snippets\">\n\
+		<p><input type=\"image\" name=\"Log in!\"\ border=\"0\"
+		src=\"[getDocumentURL]/login.jpg\"></p>\n"
+		#<input type=\"submit\" value=\"Log in\">\n"
+		registerQueryData "pageMode" "snippets"
+}
+
+proc displayMotd {} {
+	#debugLog "dm"
+	if {[file exists [getFilePrefix]/general/motd]} {
+		readFile [getFilePrefix]/general/motd
+	}
+	if {[file exists [getFilePrefix]/users/[getUserName]]} {
+		readFile [getFilePrefix]/users/[getUserName]
+	}
+}
+
+proc displayMoveMenu {identifier} {
+	global metaData
+	#debugLog "displayMoveMenu"
+	set items {}
+	foreach currentPacked $metaData {
+		array set currentUnpacked $currentPacked
+		if {[isFolder $currentUnpacked(identifier)] && \
+		  ![isDescendant $currentUnpacked(identifier) $identifier]} {
+		  lappend items $currentUnpacked(identifier)
+		}
+	}
+	set items [entrySort $items fullPathname]
+	puts -nonewline "<p>Move to: <select name=\"motion\"\
+	  onclick=\"document.[getProgramMode].submit()\">\
+	  <option value=\"notebookMove_noop_noop\" selected>Don't move this\
+	  anywhere.</option>\n\
+	  <option value=\"notebookMove_"
+	puts -nonewline $identifier
+	puts "_top\">Outside of all folders.</option>"
+	foreach destination $items {
+		puts -nonewline "<option\
+		  value=\"notebookMove_"
+		puts -nonewline $identifier
+		puts "_$destination\"\
+		  >[getFullPath $destination]</option>"
+	}
+	puts "</select></p>"
+}
+
+proc displayNewFolderMenu {} {
+	global metaData
+	#debugLog "displayNewFolderMenu"
+	set items {}
+	foreach currentPacked $metaData {
+		array set currentUnpacked $currentPacked
+		if {[isFolder $currentUnpacked(identifier)]} {
+			lappend items $currentUnpacked(identifier)
+		}
+	}
+	set items [entrySort $items fullPathname]
+	puts -nonewline "<p>Add a new folder to: <select name=\"newfolder\"\
+	  onclick=\"document.[getProgramMode].submit()\">\
+	  <option value=\"newfolder_noop\" selected>Don't add a new\
+	  folder.</option>\n\
+	  <option value=\"newfolder_top\">Outside of all folders.</option>"
+	foreach destination $items {
+		puts -nonewline "<option\
+		  value=\"newfolder_$destination\"\
+		  >[getFullPath $destination]</option>"
+	}
+	puts "</select></p>"
+}
+
+proc displayNewTopicMenu {} {
+	global metaData
+	#debugLog "displayNewTopicMenu"
+	set items {}
+	foreach currentPacked $metaData {
+		array set currentUnpacked $currentPacked
+		if {[isFolder $currentUnpacked(identifier)]} {
+			lappend items $currentUnpacked(identifier)
+		}
+	}
+	set items [entrySort $items fullPathname]
+	puts -nonewline "<p>Add a new topic to: <select name=\"newtopic\"\
+	  onclick=\"document.[getProgramMode].submit()\">\
+	  <option value=\"newtopic_noop\" selected>Don't add a new topic.</option>\
+	  <option value=\"newtopic_top\">Outside of all folders.</option>"
+	foreach destination $items {
+		puts -nonewline "<option\
+		  value=\"newtopic_$destination\"\
+		  >[getFullPath $destination]</option>"
+	}
+	puts "</select></p>"
+}
+
+proc displayQueryForm {} {
+    if {[CGIValue lookupMode] == "passage"} {
+        set lookup [getCanonicalReference]
+        set lookup [eval "exec bin/concordance --displayable-book-name\
+          $lookup"]
+    } else {
+        set lookup [CGIValue lookup]
+    }
+    puts -nonewline "<form action=\"[getActionURL]\" method=\"post\" \
+        name=\"[getProgramMode]\">\n\
+        <script language=\"JavaScript\">\n\
+        <!--\n\
+        function simple_or_advanced_search(advanced_value)\n\
+            {\n\
+            document.[getProgramMode].advancedSearch.value = advanced_value\n\
+            document.[getProgramMode].submit()\n\
+            }\n\
+        // -->\n\
+        </script>\n\
+        <table border=\"0\" cellspacing=\"0\" cellpadding=\"[getCellpadding]\">\
+        <tr><td>&nbsp;<input type=\"text\" size=\"[getTextWidth]\" value=\"$lookup\"\
+        name=\"lookup\">&nbsp; \n"
+    puts -nonewline "<input type=\"hidden\" name=\"highlightedWords\"\
+        value=\"[CGIValue highlightedWords]\">\n"
+    puts -nonewline "<input type=\"hidden\" name=\"advancedSearch\"\
+        value=\"[CGIValue advancedSearch]\">\n"
+    puts -nonewline "<input type=\"image\" name=\"Go!\"\ border=\"0\"\
+		src=\"[getDocumentURL]/submit.jpg\" align=\"middle\">\n"
+    puts -nonewline "</td></tr>\n<tr><td>"
+    if {[CGIValue lookupMode] == "concordance"} {
+        if {[CGIValue advancedSearch] == "on"} {
+            if {[CGIValue firstBook] != ""} {
+                set firstBook [CGIValue firstBook]
+            } else {
+                set firstBook "firstAvailableBook"
+            }
+            if {[CGIValue lastBook] != ""} {
+                set lastBook [CGIValue lastBook]
+            } else {
+                set lastBook "lastAvailableBook"
+            }
+            puts -nonewline "&nbsp;"
+            puts -nonewline [exec "bin/concordance" "--version"\
+                [getBibleVersion] "--menu_of_books" "first" $firstBook]
+            puts -nonewline "&nbsp; "
+            puts -nonewline [exec "bin/concordance" "--version"\
+                [getBibleVersion] "--menu_of_books" "last" $lastBook]
+            puts -nonewline "</td></tr><tr><td>"
+            if {[CGIValue includeOldTestament] != "" ||
+                [CGIValue includeApocrypha] != "" ||
+                [CGIValue includeNewTestament] != ""} {
+                puts -nonewline "<input type=\"checkbox\"\
+                    name=\"includeOldTestament\" "
+                if {[CGIValue includeOldTestament] != ""} {
+                    puts -nonewline "checked"
+                }
+                puts "> Old Testament&nbsp;"
+                puts -nonewline "<input type=\"checkbox\"\
+                    name=\"includeApocrypha\" "
+                if {[CGIValue includeApocrypha] != ""} {
+                    puts -nonewline "checked"
+                }
+                puts "> Apocrypha&nbsp;"
+                puts -nonewline "<input type=\"checkbox\"\
+                    name=\"includeNewTestament\" "
+                if {[CGIValue includeNewTestament] != ""} {
+                    puts -nonewline "checked"
+                }
+                puts "> New Testament"
+            } else {
+                puts -nonewline "<input type=\"checkbox\"\
+                    name=\"includeOldTestament\" "
+                if {[isTrue [getConfigValue "includeOldTestamentByDefault"\
+                    "yes"]]} {
+                    puts -nonewline "checked"
+                }
+                puts "> Old Testament&nbsp;&nbsp;"
+                puts -nonewline "<input type=\"checkbox\"\
+                    name=\"includeApocrypha\" "
+                if {[isTrue [getConfigValue "includeApocryphaByDefault"\
+                    "yes"]]} {
+                    puts -nonewline "checked"
+                }
+                puts "> Apocrypha&nbsp;&nbsp;"
+                puts -nonewline "<input type=\"checkbox\"\
+                    name=\"includeNewTestament\" "
+                if {[isTrue [getConfigValue "includeNewTestamentByDefault"\
+                    "yes"]]} {
+                    puts -nonewline "checked"
+                }
+                puts "> New Testament"
+            }
+            puts -nonewline "</td></tr><tr><td>"
+            puts -nonewline "<input type=\"checkbox\"\
+                name=\"matchPartialWords\""
+            if {[CGIValue matchPartialWords] != ""} {
+                puts -nonewline " checked"
+            }
+            puts -nonewline "> Match partial words"
+            puts -nonewline "</td></tr><tr><td>"
+            foreach currentVersion [getAvailableBibleVersions] {
+                puts -nonewline "<input type=\"radio\" name=\"BibleVersion\"\
+                  value=\"$currentVersion\" "
+                if {$currentVersion == [getBibleVersion]} {
+                    puts -nonewline "checked"
+                }
+                puts -nonewline "> $currentVersion&nbsp; "
+            }
+            puts -nonewline "</td></tr><tr><td>"
+            puts -nonewline "<a\
+                href=\"JavaScript:simple_or_advanced_search('off')\">Simple\
+                Search</a>\n\
+                <noscript>\n\
+                <p><strong>You will need to turn JavaScript on to move\
+                between the simple and advanced search pages.</strong></p>\n\
+                </noscript>\n"
+        } else {
+            if {[CGIValue firstBook] != ""} {
+                puts "<input type=\"hidden\" name=\"firstBook\"\
+                    value=\"[CGIValue firstBook]\">"
+            } else {
+                puts "<input type=\"hidden\" name=\"firstBook\"\
+                    value=\"firstAvailableBook\">"
+            }
+            if {[CGIValue lastBook] != ""} {
+                puts "<input type=\"hidden\" name=\"lastBook\"\
+                    value=\"[CGIValue lastBook]\">"
+            } else {
+                puts "<input type=\"hidden\" name=\"lastBook\"\
+                    value=\"lastAvailableBook\">"
+            }
+            puts "<input type=\"hidden\" name=\"matchPartialWords\"\
+                value=\"[CGIValue matchPartialWords]\">\n"
+            if {[CGIValue BibleVersion] != ""} {
+                puts "<input type=\"hidden\" name=\"BibleVersion\"\
+                    value=\"[CGIValue BibleVersion]\">"
+            } else {
+                puts "<input type=\"hidden\" name=\"BibleVersion\"\
+                    value=\"[getConfigValue defaultBibleVersion RSV]\">"
+            }
+            if {[CGIValue includeOldTestament] != "" || [CGIValue\
+                includeApocrypha] != "" || [CGIValue includeNewTestament]\
+                != ""} {
+            } else {
+                if {[isTrue [getConfigValue "includeOldTestamentByDefault"\
+                    "yes"]]} {
+                    puts "<input type=\"hidden\" name=\"includeOldTestament\"\
+                        value=\"yes\">"
+                }
+                if {[isTrue [getConfigValue "includeApocryphaByDefault"\
+                    "yes"]]} {
+                    puts "<input type=\"hidden\" name=\"includeApocrypha\"\
+                        value=\"yes\">"
+                }
+                if {[isTrue [getConfigValue "includeNewTestamentByDefault"\
+                    "yes"]]} {
+                    puts "<input type=\"hidden\" name=\"includeNewTestament\"\
+                        value=\"yes\">"
+                }
+            }
+            puts -nonewline "<a\
+                href=\"JavaScript:simple_or_advanced_search('on')\">Advanced\
+                Search</a>\n\
+                <noscript>\n\
+                <p><strong>You will need to turn JavaScript on to move\
+                between the simple and advanced search pages.</strong></p>\n\
+                </noscript>\n"
+        }
+        puts -nonewline "</td></tr>\n<tr><td>"
+    }
+    if {[shouldPresentChoiceBetweenConcordanceAndPassageLookup]} {
+        if {[CGIValue lookupMode] == "passage"} {
+            puts -nonewline "<input type=\"radio\" name=\"lookupMode\"\
+                value=\"concordance\"> Concordance\
+                <input type=\"radio\" name=\"lookupMode\" value=\"passage\"\
+                checked> Passage</td></tr>\n"
+        } else {
+            puts -nonewline "<tr><td><input type=\"radio\" name=\"lookupMode\"\
+                value=\"concordance\" checked> Concordance\
+                <input type=\"radio\" name=\"lookupMode\" value=\"passage\">
+                Passage</td></tr>\n"
+        }
+        puts -nonewline "<tr><td>"
+    } else {
+        puts -nonewline "<input type=\"hidden\" name=\"lookupMode\" \
+            value=\"[CGIValue lookupMode]\">\n"
+    }
+    puts -nonewline "</tr></td>\n\
+        </table>"
+}
+proc displayStandardChoices {} {
+	#debugLog "dsc"
+	if {[CGIValue accessMethod] == "guest"} {
+		return
+	}
+	puts "<hr>\n<p>"
+	#if {[getProgramMode] != "MagicNotebook"} {
+		puts -nonewline "<input type=\"radio\" name=\"pageMode\"\
+			value=\"snippets\"\ checked\
+			onclick=\"document.[getProgramMode].submit()\"\
+			>\n"
+		puts -nonewline "Show another [getProgramName] page.<br>\n"
+	#}
+	puts -nonewline "<input type=\"radio\" name=\"pageMode\" value=\"metaSnippets\"\
+		onclick=\"document.[getProgramMode].submit()\""
+	#if {[getProgramMode] == "MagicNotebook"} {
+		#puts -nonewline "checked"
+	#}
+	puts -nonewline ">\n\
+		Edit what appears on the [getProgramName] page.\n"
+	switch [CGIValue accessMethod] {
+		guest -
+		wiki {
+		}
+		default {
+			puts -nonewline "<br><input type=\"radio\" name=\"pageMode\"\
+				value=\"accountManagement\"\
+				onclick=\"document.[getProgramMode].submit()\"\
+				>\n\
+				Change your password or otherwise manage your account.<br>\n"
+		}
+	}
+	if {[isAdministrator [getUserName]]} {
+		puts -nonewline "<input type=\"radio\" name=\"pageMode\"\
+			value=\"administrative\"\
+			onclick=\"document.[getProgramMode].submit()\"\
+			> Use administrative tools.<br>"
+	}
+	puts -nonewline "</p>\n<p><input type=\"image\" name=\"Go!\"\ border=\"0\"\
+		src=\"[getDocumentURL]/submit.jpg\"></p>\n"
+	#puts -nonewline "<input type=\"submit\" value=\"Go!\"></p>\n"
+}
+
+proc editFolder {identifier} {
+	#debugLog "ef"
+	#saveSelectedTopic $identifier
+	puts -nonewline "<input type=\"hidden\" name=\"topic\"\
+		value=\"$identifier\">\n\
+		<input type=\"hidden\" name=\"pageMode\" value=\"metaSnippetsAction\">\n\
+		<h2>Folder</h2>\n"
+	registerQueryData "topic" $identifier
+	registerQueryData "pageMode" "metaSnippetsAction"
+	if {[getProgramMode] == "sidebar"} {
+		puts -nonewline "<p>This topic name will be visible to you when you\
+			edit this page, but not to your visitors. Use the header, below,\
+			to put any desired HTML before items in this topic.</p>\n"
+	}
+	puts -nonewline "<p><input type=\"text\" name=\"title_$identifier\"\
+		size=\"[getTextWidth]\" value=\"[quoteHtmlMetacharacters [getTopicName\
+		$identifier]]\"></p>\n"
+	puts -nonewline "<hr>\
+		<p><input type=\"radio\" name=\"shouldsave\" value=\"yes\" checked>\
+		Save any changes<br>\n\
+		<input type=\"radio\" name=\"shouldsave\" value=\"no\">\
+		Discard any changes</p>\n\
+		<hr>"
+	displayMoveMenu $identifier
+	puts "<input type=\"radio\" name=\"action\"\
+		value=\"newSubFolder\"\
+		onclick=\"document.[getProgramMode].submit()\"\
+		>\n\
+		Add a new folder to this folder.<br>\
+		<input type=\"radio\" name=\"action\"\
+		value=\"newSubTopic\"\
+		onclick=\"document.[getProgramMode].submit()\"\
+		>\n\
+		Add a new note to this folder.<br>"
+	if {[testMetaDataFlag $identifier "show"]} {
+		puts "<p><input type=\"radio\" name=\"action\"\
+			value=\"hide_$identifier\"\
+			onclick=\"document.[getProgramMode].submit()\"\
+			>\
+			Hide<br>"
+	} else {
+		puts "<input type=\"radio\" name=\"action\"\
+			value=\"show_$identifier\"\
+			onclick=\"document.[getProgramMode].submit()\"\
+			>\
+			Show<br>"
+	}
+	puts -nonewline "<hr>\
+		<p><input type=\"radio\" name=\"action\"\
+		value=\"deletefolder_$identifier\"> Delete this folder and everything\
+		in it.</p>\
+		<hr>\n"
+	puts -nonewline "<p><input type=\"image\" name=\"Go!\"\ border=\"0\"
+		src=\"[getDocumentURL]/submit.jpg\"></p>\n"
+}
+
+proc editTopic {identifier} {
+	#debugLog "editTopic"
+	puts -nonewline "<input type=\"hidden\" name=\"topic\"\
+		value=\"$identifier\">\n\
+		<input type=\"hidden\" name=\"pageMode\" value=\"metaSnippetsAction\">\n\
+		<h2>Topic</h2>\n"
+	registerQueryData "topic" $identifier
+	registerQueryData "pageMode" "metaSnippetsAction"
+	#saveSelectedTopic $identifier
+	if {[getProgramMode] == "sidebar"} {
+		puts -nonewline "<p>This topic name will be visible to you when you\
+			edit this page, but not to your visitors. Use the header, below,\
+			to put any desired HTML before items in this topic.</p>\n"
+	}
+	puts -nonewline "<p><input type=\"text\" name=\"title_$identifier\"\
+		size=\"[getTextWidth]\" value=\"[quoteHtmlMetacharacters [getTopicName\
+		$identifier]]\"></p>\n"
+	if {[getProgramMode] == "MagicNotebook"} {
+		puts -nonewline "<h2>This Note's Text</h2>\n"
+		puts -nonewline "<textarea name=\"header_$identifier\" rows=\"16\"\n"
+	} else {
+		puts -nonewline "<h2>Header</h2>\n\
+			<p>This header, if any, will appear before each snippet.</p>\n"
+		puts -nonewline "<textarea name=\"header_$identifier\" rows=\"3\"\n"
+	}
+
+	puts -nonewline "cols=\"[getTextWidth]\" wrap=\"soft\">[quoteHtmlMetacharacters\
+		[getHeader $identifier]]</textarea>"
+	# Tweak added 27 Nov 02 by Jonathan Hayward to improve interface.
+	if {[getProgramMode] != "MagicNotebook" || [testUserFlag [getUserName]\
+	  "editsnippets"] || [llength [readTopic $identifier]] > 0} {
+		set topic [readTopic $identifier]
+		if {[getProgramMode] == "MagicNotebook"} {
+			puts -nonewline "<h2>Random Text</h2>\n\
+				<p>The Magic Notebook can display random text under what you\
+				type above. If you would like a randomly chosen quote to\
+				appear, type the first thing in the box below, and then click\
+				on \"Continue editing this topic\" for as many other things as\
+				you would like to see.</p>\n"
+		} else {
+			puts "<h2>Entries:</h2>"
+		}
+		set newIndex 0
+		if {[llength $topic] > 0} {
+			for {set index 0} {$index < [llength $topic]} {incr index} {
+				set entry [lindex $topic $index]
+				puts -nonewline "<p><textarea name=\"value_$identifier"
+				puts -nonewline "_$index\" rows=\"3\" cols=\"[getTextWidth]\"\
+				  wrap=\"soft\">"
+				puts -nonewline [quoteHtmlMetacharacters $entry]
+				puts -nonewline "</textarea><br>\n\
+					<input type=\"checkbox\" name=\"delete_$identifier"
+				puts -nonewline "_$index\">Delete this entry</p>\n"
+			}
+			set newIndex $index
+		}
+		puts -nonewline "<h2>Add new entry:</h2>\n\
+			<p><textarea name=\"value_$identifier"
+		puts -nonewline "_$newIndex\" rows=\"5\""
+		puts -nonewline "cols=\"[getTextWidth]\" wrap=\"soft\"></textarea></p>\n"
+		}
+	puts -nonewline "\
+		<hr>\n\
+		<p><input type=\"radio\" name=\"shouldsave\" value=\"yes\" checked>\
+		Save any changes<br>\n\
+		<input type=\"radio\" name=\"shouldsave\" value=\"no\">\
+		Discard any changes</p>\n\
+		<hr>\n"
+	if {[getProgramMode] == "MagicNotebook"} {
+		displayMoveMenu $identifier
+		if {[testMetaDataFlag $identifier "show"]} {
+		puts -nonewline "<p><input type=\"radio\" name=\"action\"\n\
+			value=\"hide_$identifier\"
+			onclick=\"document.[getProgramMode].submit()\"\
+			> Hide<br>"
+		} else {
+		puts -nonewline "<p><input type=\"radio\" name=\"action\"\n\
+			value=\"show_$identifier\"
+			onclick=\"document.[getProgramMode].submit()\"\
+			> Show<br>"
+		}
+		puts -nonewline \
+			"<input type=\"radio\" name=\"action\"\n\
+			value=\"edittopic_$identifier\"\
+			onclick=\"document.[getProgramMode].submit()\"\
+			> Continue editing this topic<br>\n"
+	} else {
+		puts -nonewline \
+			"<p><input type=\"radio\" name=\"action\"\n\
+			value=\"edittopic_$identifier\"\
+			onclick=\"document.[getProgramMode].submit()\"\
+			> Continue editing this topic<br>\n"
+	}
+	puts -nonewline "<input type=\"radio\" name=\"action\" value=\"metaSnippets\"\
+		onclick=\"document.[getProgramMode].submit()\">\
+		Return to the editing menu.<br>\n"
+	puts "<input type=\"radio\" name=\"action\" value=\"snippet\"\n\
+		onclick=\"document.[getProgramMode].submit()\"\
+		checked> Return to the viewing page.</p>\n\
+		<hr>\
+		<p><input type=\"radio\" name=\"action\"\
+		value=\"deletetopic_$identifier\"> Delete this topic.</p>\
+		<hr>\
+		<p><input type=\"image\" name=\"Go!\"\ border=\"0\"
+		src=\"[getDocumentURL]/submit.jpg\"></p>\n"
+		#<p><input type=\"submit\" value=\"Go!\"></p>\n"
+}
+
+proc entrySort {toSort {criterionToSortOn "topicName"}} {
+	global metaData
+	#debugLog "es"
+	# Randomized QuickSort implemented after bubble sort took too long.
+	# We append the internal name to the external key so the output
+	# will always be in the same order, i.e. two fields with the same
+	# name won't appear in variable order.
+	if {[llength $toSort] < 2} {
+		return $toSort
+	}
+	set dividingKey [lindex $toSort [expr int( rand() * [llength \
+	  $toSort] ) ] ]
+	set lesserBin {}
+	set greaterOrEqualBin {}
+	switch $criterionToSortOn {
+		fullPathname {
+			set dividingFieldToCompare [getFullPath $dividingKey]
+		}
+		topicName -
+		default {
+			set dividingFieldToCompare [getTopicName $dividingKey]
+		}
+	}
+	foreach current $toSort {
+		if {$current != $dividingKey} {
+			switch $criterionToSortOn {
+				fullPathname {
+					set currentFieldToCompare [getFullPath $current]
+				}
+				topicName -
+				default {
+					set currentFieldToCompare [getTopicName $current]
+				}
+			}
+			# Sort on displayed field value, using the key as a tiebreaker
+			# so as to have consistent behavior between two items of the same
+			# key.
+			if {[string compare -nocase $currentFieldToCompare \
+			  $dividingFieldToCompare] < 0} {
+				lappend lesserBin $current
+			} elseif {[string compare -nocase $currentFieldToCompare \
+			  $dividingFieldToCompare] > 0} {
+				lappend greaterOrEqualBin $current
+			} else {
+				if {[string compare -nocase $current $dividingKey] < 0} {
+					lappend lesserBin $current
+				} else {
+					lappend greaterOrEqualBin $current
+				}
+			}
+		}
+	}
+	return [concat [entrySort $lesserBin $criterionToSortOn] $dividingKey\
+	[entrySort $greaterOrEqualBin $criterionToSortOn]]
+}
+
+#proc entrySort {toSort {criterionToSortOn "topicName"}} {
+#	global metaData
+#	#debugLog "es"
+#	# Bubble entrySort the results--we should be working with small enough data that
+#	# this is insignificant next to the time taken for i.e. I/O and network
+#	# traffic.
+#	for {set largeIndex 0} {$largeIndex < [expr [llength $toSort] - 1]} {incr \
+#	  largeIndex} {
+#		#Don't start at $largeIndex -- I was trimming the wrong side.
+#		for {set smallIndex 0} {$smallIndex < [expr [llength \
+#		  $toSort] - 1 - $largeIndex]} {incr smallIndex} {
+#			#debugLog "es0.0.1 $largeIndex $smallIndex [lindex $toSort $smallIndex]\
+#			  #[lindex $toSort [expr $smallIndex + 1]]"
+#			switch $criterionToSortOn {
+#				fullPathname {
+#					set currentFieldToCompare [getFullPath [lindex \
+#					  $toSort $smallIndex]]
+#					set nextFieldToCompare [getFullPath [lindex $toSort \
+#					  [expr $smallIndex + 1]]]
+#				}
+#				topicName -
+#				default {
+#					set currentFieldToCompare [getTopicName [lindex \
+#					  $toSort $smallIndex]]
+#					set nextFieldToCompare [getTopicName [lindex $toSort \
+#					  [expr $smallIndex + 1]]]
+#				}
+#			}
+#			#debugLog "es1 $currentFieldToCompare $nextFieldToCompare"
+#			if {[string compare -nocase $currentFieldToCompare \
+#			  $nextFieldToCompare] > 0} {
+#				  #debugLog "es0.1.2 Swapping $current"
+#				set juggle [lindex $toSort $smallIndex]
+#				set toSort [lreplace $toSort $smallIndex $smallIndex \
+#				  [lindex $toSort [expr $smallIndex + 1]]]
+#				set toSort [lreplace $toSort [expr $smallIndex + 1] \
+#				  [expr $smallIndex + 1] $juggle]
+#			}
+#		}
+#	}
+#	return $toSort
+#}
+
+proc entrySortWithParent {parentID {criterionToSortOn "topicName"}} {
+	global metaData
+	#debugLog "eswp"
+	set matches {}
+	for {set index 0} {$index < [llength $metaData]} {incr index} {
+		array set current [lindex $metaData $index]
+		if {$current(parent) == $parentID} {
+			#debugLog "eswp $current(identifier)"
+			lappend matches $current(identifier)
+		}
+	}
+	return [entrySort $matches $criterionToSortOn]
+}
+
+proc expand {id} {
+	global metaData
+	#debugLog "e"
+	readMetaData
+	for {set index 0} {$index < [llength $metaData]} {incr index} {
+		array set current [lindex $metaData $index]
+		if {$current(identifier) == $id} {
+			set current(flags) [setFlag "$current(flags)" "expand"]
+			set metaData [lreplace $metaData $index $index [array get current]]
+		}
+	}
+	writeMetaData
+}
+
+proc expandOnlyNodeAndAllParents {nodeIdentifier} {
+	global metaData
+	#debugLog "eonaap"
+	foreach packedRow $metaData {
+		array set currentRow $packedRow
+		if {![isAncestor $nodeIdentifier $currentRow(identifier)]} {
+		#if {$currentRow(parent) != "top"} {
+			collapse $currentRow(identifier)
+		#}
+		}
+	}
+	expandOnlyNodeAndAllParentsInternal $nodeIdentifier
+}
+
+proc expandOnlyNodeAndAllParentsInternal {nodeIdentifier} {
+	global metaData
+	#debugLog "eonaapi"
+	expand $nodeIdentifier
+	foreach packedRow $metaData {
+		array set currentRow $packedRow
+		if {$currentRow(identifier) == $nodeIdentifier} {
+			expandOnlyNodeAndAllParentsInternal $currentRow(parent)
+		}
+	}
+}
+
+# Presently a noop filter.  May be modified to sanitize HTML, convert ASCII to
+# HTML, and so on and so forth.
+proc filterText {original} {
+	#debugLog "ft"
+	if {[shouldAllowHtmlSnippets]} {
+		if {[testUserFlag [getUserName] "text"]} {
+			return [textToHtml $original]
+		} elseif {[testUserFlag [getUserName] "html"]} {
+			return $original
+		} else {
+			switch [getDefaultDisplayMethod] {
+				"text" {
+					return [textToHtml $original]
+				}
+				"html" {
+					return "<p>$original</p>"
+				}
+				"mixed" -
+				default {
+					return "[lineBreaksToHtml $original]"
+				}
+			}
+		}
+	} else {
+		return [textToHtml $original]
+	}
+}
+
+proc forgotPassword {} {
+	#debugLog "fp"
+	puts -nonewline "<input type=\"hidden\" name=\"pageMode\"\
+		value=\"retrievePassword\">\n\
+		<p>Please type in the e-mail address that you used when creating your\
+		account:</p>\n\
+		<p><input type=\"text\" name=\"login\" size=\"[getTextWidth]\"></p>\n\
+		<p><input type=\"image\" name=\"E-mail me my password\"\ border=\"0\"
+		src=\"[getDocumentURL]/email_me_my_password.jpg\"></p>\n"
+		#<p><input type=\"submit\" value=\"E-mail me my password\"></p>\n"
+	registerQueryData "pageMode" "retrievePassword"
+}
+
+proc getActionURL {} {
+	#debugLog "gau"
+	return [getConfigValue "actionURL" "/cgi-bin/[getProgramMode]"]
+}
+
+proc getAvailableBibleVersions {} {
+    #debugLog "getAvailableBibleVersions"
+    return [getConfigValue "availableBibleVersions" "KJV RSV"]
+}
+
+proc getBibleVersion {} {
+    #debugLog "getBibleVersion"
+    if {[CGIValue BibleVersion] != ""} {
+        return [CGIValue BibleVersion]
+    } else {
+        return [getDefaultBibleVersion]
+    }
+}
+
+proc getCanonicalReference {} {
+    #debugLog "getCanonicalReference"
+    set lookup [CGIValue lookup]
+    if {![regexp -- "\[a-zA-Z\]" $lookup]} {
+        return ""
+    }
+    set lookup [string tolower $lookup]
+    # We may get incomplete behaviour if someone tries to e.g. lookup Psalms
+    # 149:3-151:2.
+    if {[regexp -- "^p\[a-zA-Z ]*151:" $lookup]} {
+        regsub {:} $lookup { 1:} lookup
+    }
+    regsub -all {\.} $lookup "" lookup
+    set numeric [lindex $lookup [expr [llength $lookup] - 1]]
+    set lookup [lreplace $lookup [expr [llength $lookup] - 1]\
+        [expr [llength $lookup] - 1]]
+    if {![regexp -- "\[0-9\]" $numeric]} {
+        set lookup "$lookup $numeric"
+        set numeric 1
+    }
+    regsub -all { } $lookup {\-} lookup
+    switch [string index $lookup 0] {
+        1 {
+            regsub 1 $lookup i lookup
+        }
+        2 {
+            regsub 2 $lookup ii lookup
+        }
+        3 {
+            regsub 3 $lookup iii lookup
+        }
+        4 {
+            regsub 4 $lookup iv lookup
+        }
+        5 {
+            regsub 5 $lookup v lookup
+        }
+        6 {
+            regsub 6 $lookup vi lookup
+        }
+        7 {
+            regsub 7 $lookup vii lookup
+        }
+        8 {
+            regsub 8 $lookup viii lookup
+        }
+        9 {
+            regsub 9 $lookup ix lookup
+        }
+    }
+    set lookup [removeShellMetacharacters $lookup]
+    set numeric [removeShellMetacharacters $numeric]
+    if {[chaptersIn $lookup] == 1 && [regexp -- "^\[0-9\]+$" $numeric] && \
+        $numeric != 1} {
+        set numeric "1:$numeric"
+    }
+    set lookup "$lookup $numeric"
+    return $lookup
+}
+
+proc getCellpadding {} {
+    #debugLog "getCellpadding"
+    return [getConfigValue "cellpadding" "2"]
+}
+
+proc getClosedFolderIconFilename {} {
+	#debugLog "gcfif"
+	return "[getDocumentURL]/closed_folder.gif"
+}
+
+proc getClosedTopicIconFilename {} {
+	#debugLog "gctif"
+	return "[getDocumentURL]/closed_topic.gif"
+}
+
+proc getCloseTopicNameTag {} {
+	#debugLog "gctnt"
+	return ""
+}
+
+proc getCollapseLinkBeginning {identifier} {
+	global additionalQueryData
+	#debugLog "gclb"
+	puts -nonewline "<a class=\"titlelink\" target=\"_self\"\
+	  href=\"[getActionURL]?pageMode=snippets&topic=$identifier&action=collapse_$identifier&$additionalQueryData\">"
+}
+
+proc getConfigFilename {} {
+	global configFilename
+	#debugLog "gcf"
+	return $configFilename
+}
+
+proc getConfigValue {key defaultValue} {
+	global configResult
+	#debugLog "gcv"
+	foreach candidateKey [array names configResult] {
+		#debugLog "gcv1 $candidateKey"
+		if {$candidateKey == $key} {
+			return $configResult($key)
+		}
+	}
+	return $defaultValue
+}
+
+proc getCurrentMtimeFilename {} {
+	#debugLog "gcmf"
+	return "[getFilePrefix]/general/current"
+}
+
+proc getDefaultAccessMethod {} {
+	#debugLog "gdam"
+	return [getConfigValue "defaultAccessMethod" "guest"]
+}
+
+proc getDefaultBibleVersion {} {
+    #debugLog "getDefaultVersion"
+    return [getConfigValue "defaultBibleVersion" "RSV"]
+}
+
+proc getDefaultDisplayMethod {} {
+	#debugLog "gddm"
+	return [getConfigValue "defaultDisplayMethod" "mixed"]
+}
+
+proc getDeletionMarker {} {
+	#debugLog "gdm"
+	return "Scheduled for deletion 50mwrx34."
+}
+
+proc getDocumentURL {} {
+	#debugLog "gdu"
+	return [getConfigValue "documentURL" "/[getProgramMode]/"]
+}
+
+proc getEditLinkBeginning {identifier} {
+	global additionalQueryData
+	#debugLog "gelb"
+	if {[testMetaDataFlag $identifier "folder"]} {
+		puts -nonewline "<a class=\"titlelink\" target=\"_self\"\
+		  href=\"[getActionURL]?$additionalQueryData&pageMode=metaSnippetsAction&action=editfolder_$identifier\">"
+	} else {
+		puts -nonewline "<a class=\"titlelink\" target=\"_self\"\
+		  href=\"[getActionURL]?$additionalQueryData&pageMode=metaSnippetsAction&action=edittopic_$identifier\">"
+	}
+}
+
+proc getFilePrefix {} {
+	#debugLog "gfp1"
+	return [getConfigValue "filePrefix" "/var/www/[getProgramMode]/"]
+}
+
+proc getFullBaseURL {} {
+	#debugLog "gfbu"
+	return [getConfigValue "fullBaseURL" "http://127.0.0.1/cgi-bin/[getProgramMode]"]
+}
+
+proc getFullPath {id} {
+	#return [getTopicName $id]
+	#debugLog "getFullPath"
+	if {[getParent $id] != "top"} {
+		return "[getFullPath [getParent $id]] -&gt; [getTopicName $id]"
+	} else {
+		return "[getTopicName $id]"
+	}
+}
+
+proc getHeader {id} {
+	global metaData
+	#debugLog "getHeader"
+	set index 0
+	set shouldContinue 1
+	while {$shouldContinue} {
+		if {$index >= [llength $metaData]} {
+			set shouldContinue 0
+		} else {
+			array set current [lindex $metaData $index]
+			if {$current(identifier) == $id} {
+				return $current(header)
+			}
+		}
+		incr index
+	}
+	return ""
+}
+
+# Parts of this are intended to run quickly, to decrease the window of bad
+# opportunity for a file to become corrupted.
+proc getLock {filename} {
+	#debugLog "getLock"
+	set currentMtimeFilename [getCurrentMtimeFilename]
+	set lockTimeout [getLockTimeout]
+	set startTime [clock seconds]
+	if {[file exists "$filename.lock"]} {
+		set shouldContinue 1
+		while {$shouldContinue} {
+			#debugLog "glI.1"
+			if { [catch {open "$currentMtimeFilename" w} fileId] } {
+				logMessage "gl2 Couldn't open $currentMtimeFilename for\
+					writing."
+				panic
+			} else {
+				close $fileId
+			}
+			if {[file exists "$filename.lock"]} {
+				if { [catch {open "$currentMtimeFilename" w} fileId] } {
+					logMessage "gl1 Couldn't open $filename.lock for writing."
+					panic
+				} else {
+					close $fileId
+				}
+				if {[file mtime "$currentMtimeFilename"] -\
+					[file mtime "$filename.lock"] > $lockTimeout} {
+					# Assume it's timed out, and commandeer the lock for
+					# ourselves.
+					if { [catch {open "$filename.lock" w} fileId] } {
+						logMessage "gl2 Couldn't open $filename.lock for\
+							writing."
+						panic
+					} else {
+						close $fileId
+					}
+					registerLock $filename
+					return
+				}
+			#debugLog "glI.3"
+			} else {
+			#debugLog "glI.4"
+				if { [catch {open "$filename.lock" w} fileId] } {
+					logMessage "gl3 Couldn't open $filename.lock for writing."
+					panic
+				} else {
+					close $fileId
+				}
+				registerLock $filename
+				return
+			}
+			if {[clock seconds] - $startTime < $lockTimeout} {
+				set shouldContinue 0
+			}
+			after 10
+		}
+		# Assume it's timed out, and commandeer the lock for
+		# ourselves.
+		if { [catch {open "$filename.lock" w} fileId] } {
+			logMessage "gl2 Couldn't open $filename.lock for\
+				writing."
+			panic
+		} else {
+			close $fileId
+		}
+		registerLock $filename
+		return
+	} else {
+		if { [catch {open "$filename.lock" w} fileId] } {
+			logMessage "gl4 Couldn't open $filename.lock for writing."
+			panic
+		} else {
+			close $fileId
+		}
+		registerLock $filename
+		return
+	}
+}
+
+proc getLockTimeout {} {
+	#debugLog "glt"
+	return [getConfigValue "lockTimeout" "20"]
+}
+
+proc getMailerCommand {login} {
+	#debugLog "gmc"
+	set login [removeShellMetacharacters $login]
+	set template [getConfigValue "mailerCommand"\
+		"/usr/bin/Mail LOGIN -s \"Your [getProgramName] password\""]
+	regsub -- {LOGIN} $template $login template
+	return $template
+}
+
+proc getMetaDataFilename {} {
+	#debugLog "gmdf"
+	return [getUserMetaDataFilename [getUserName]]
+}
+
+proc getNumberOfTopics {} {
+	#debugLog "gnot"
+	global metaData
+	return [llength $metaData]
+}
+
+proc getOpenFolderIconFilename {} {
+	#debugLog "gofif"
+	return "[getDocumentURL]/open_folder.gif"
+}
+
+proc getOpenTopicIconFilename {} {
+	#debugLog "gotif"
+	return "[getDocumentURL]/open_topic.gif"
+}
+
+proc getOpenTopicNameTag {} {
+	#debugLog "gotnt"
+	return ""
+}
+
+# Name does not reflect procedure's full functionality.
+proc getPageMode {} {
+	global administrativeActionResult
+	global actionObject
+	global editCommand
+	global pageModeHasBeenCalled
+	global pageModeResult
+	#debugLog "getPageMode"
+	if {$pageModeHasBeenCalled} {
+		return $pageModeResult
+	}
+	#updateDisplayedData
+	set pageModeHasBeenCalled 1
+	set pageModeResult "snippets"
+	set editCommand ""
+	set rawMode [CGIValue pageMode]
+	if {[CGIValue login] == "guest"} {
+		set pageModeResult "connect"
+		return $pageModeResult
+	}
+	switch $rawMode {
+		"administrative" -
+		"connect" -
+		"createLogin" -
+		"forgotPassword" -
+		"retrievePassword" {
+			set pageModeResult $rawMode
+			return $pageModeResult
+		}
+		"snippets" {
+			set action [CGIValue action]
+			set pageModeResult $rawMode
+			updateDisplayedData
+			if {[CGIValue shouldsave] == "yes"} {
+				saveSubmittedChanges
+			}
+			addTemplates
+			set pageModeResult $rawMode
+			return $pageModeResult
+		}
+		"accountManagement" {
+			switch [CGIValue accountManagement] {
+				"returnToSnippets" {
+					set pageModeResult "snippets"
+					return $pageModeResult
+				}
+				"addTemplates" -
+				"changePassword" -
+				"updateHtmlPreference" -
+				default {
+					processAccountManagement
+					set pageModeResult "accountManagement"
+					return $pageModeResult
+				}
+			}
+		}
+		"administrativeAction" {
+			if {[isAdministrator [getUserName]]} {
+				switch [CGIValue administrativeAction] {
+					"addUser" -
+					"changeUserPassword" -
+					"deleteUser" -
+					"grantAdministrativePriveleges" -
+					"lockUser" -
+					"revokeAdministrativePriveleges" -
+					"resetUserFromTextOnly" -
+					"setUserToTextOnly" -
+					"unlockUser" {
+						processAdministrativeAction
+						set pageModeResult "administrative"
+						return $pageModeResult
+					}
+					"switchUser" {
+						if {[userExists [CGIValue switchUserId]]} {
+							puts "<input type=\"hidden\"\
+								name=\"effectiveUserId\"\ value=\"[CGIValue\
+								switchUserId]\">"
+							registerQueryData "effectiveUserID"\
+							  [CGIValue switchUserId]
+							#set effectiveUserId [CGIValue switchUserId]
+							puts "<p><strong>You are now using the program as\
+								user <em>[CGIValue switchUserId]</em>.</p>"
+							set pageModeResult "metaSnippets"
+							return $pageModeResult
+						} else {
+							set administrativeActionResult "<p>There does not\
+								appear to be a user <em>[CGIValue\
+								switchUserId]</em>.  You might check your
+								spelling.</p>"
+							set pageModeResult "administrative"
+							return $pageModeResult
+						}
+					}
+					"listUsers" {
+						set pageModeResult "listUsers"
+						return $pageModeResult
+					}
+					"returnToSnippets" {
+						set pageModeResult "snippets"
+						return $pageModeResult
+					}
+				}
+			} else {
+				set pageModeResult "snippets"
+				return $pageModeResult
+			}
+		}
+		"metaSnippets" {
+			updateDisplayedData
+			if {[CGIValue shouldsave] == "yes"} {
+				saveSubmittedChanges
+			}
+			set pageModeResult "metaSnippets"
+			return $pageModeResult
+		}
+		"metaSnippetsAction" {
+			updateDisplayedData
+			set action [CGIValue action]
+			switch -exact [CGIValue newfolder] {
+				newfolder_noop {
+					#set pageModeResult "metaSnippets"
+					#return $pageModeResult
+				}
+				"" {
+				}
+				default {
+					set action [CGIValue newfolder]
+				}
+			}
+			switch -exact [CGIValue newtopic] {
+				newtopic_noop {
+					#set pageModeResult "metaSnippets"
+					#return $pageModeResult
+				}
+				"" {
+				}
+				default {
+					set action [CGIValue newtopic]
+				}
+			}
+			switch -regexp $action {
+				{^(.*?)_(.*)$} {
+					regexp {^(.*?)_(.*)$} $action match editCommand \
+						actionObject
+					switch -exact -- $editCommand {
+						edit {
+							set pageModeResult "editSnippet"
+							return $pageModeResult
+						}
+						editfolder {
+							set pageModeResult "editFolder"
+							return $pageModeResult
+						}
+						edittopic {
+							set pageModeResult "editTopic"
+							return $pageModeResult
+						}
+						newfolder {
+							if {$actionObject == "top"} {
+								set pageModeResult "newFolder"
+								return $pageModeResult
+							} else {
+								set pageModeResult "newSubFolder"
+								return $pageModeResult
+							}
+						}
+						newtopic {
+							if {$actionObject == "top"} {
+								set pageModeResult "newTopic"
+								return $pageModeResult
+							} else {
+								set pageModeResult "newSubTopic"
+								return $pageModeResult
+							}
+						}
+						default {
+							set pageModeResult "metaSnippets"
+							return $pageModeResult
+						}
+					}
+				}
+				{^snippet$} -
+				{^snippets$} {
+					set pageModeResult "snippets"
+					return $pageModeResult
+				}
+				{^metaSnippets$} {
+					set pageModeResult "metaSnippets"
+					return $pageModeResult
+				}
+				{^newFolder$} {
+					set pageModeResult "newFolder"
+					return $pageModeResult
+				}
+				{^newSubFolder$} {
+					set pageModeResult "newSubFolder"
+					return $pageModeResult
+				}
+				{^newSubTopic$} {
+					set pageModeResult "newSubTopic"
+					return $pageModeResult
+				}
+				{^newTopic$} {
+					set pageModeResult "newTopic"
+					return $pageModeResult
+				}
+				{^mainMenu$} {
+					set pageModeResult "entryMenu"
+					return $pageModeResult
+				}
+				default {
+					set pageModeResult "metaSnippets"
+					return $pageModeResult
+				}
+			}
+		}
+		default {
+			switch [getProgramMode] {
+				"sidebar" {
+					if {[CGIExists administrative]} {
+						set pageModeResult "connect"
+						return $pageModeResult
+					} else {
+						set pageModeResult "sidebar"
+						return $pageModeResult
+					}
+				}
+				"snippets" -
+				default {
+					set pageModeResult "entryMenu"
+					return $pageModeResult
+				}
+			}
+		}
+	}
+}
+
+proc getParent {identifier} {
+	global metaData
+	#debugLog "gp"
+	foreach currentPacked $metaData {
+		array set currentUnpacked $currentPacked
+		if {$currentUnpacked(identifier) == $identifier} {
+			return $currentUnpacked(parent)
+		}
+	}
+	# We shouldn't get here, but just in case:
+	return "top"
+}
+
+proc getPassword {login} {
+	global passwords
+	#debugLog "gp2"
+	readPasswords
+	set index 0
+	set shouldContinue 1
+	while {$shouldContinue} {
+		array set currentRow [lindex $passwords $index]
+		if {$index >= [llength $passwords]} {
+			set shouldContinue 0
+		} else {
+			if {($currentRow(login) == $login)} {
+				return $currentRow(password)
+			}
+		}
+		incr index
+	}
+	return 0
+}
+
+proc getPasswordFilename {} {
+	#debugLog "gpf"
+	return "[getFilePrefix]/general/access"
+}
+
+proc getProgramMode {} {
+	#return "snippets"
+	#return "sidebar"
+	#return "MagicNotebook"
+	return "bibletool"
+}
+
+proc getProgramName {} {
+	switch [getProgramMode] {
+		MagicNotebook {
+			return "Magic Notebook"
+		}
+		sidebar {
+			return "Sidebar in a Can"
+		}
+		snippets {
+			return "Snippets"
+		}
+	}
+}
+
+proc getSelectedTopic {} {
+	global metaData
+	#debugLog "gst"
+	#return [CGIValue topic]
+	foreach currentPacked $metaData {
+		array set currentUnpacked $currentPacked
+		if {[testFlag $currentUnpacked(flags) "selected"]} {
+			return $currentUnpacked(identifier)
+		}
+	}
+	return ""
+}
+
+proc getServerAdminEmail {} {
+	#debugLog "gsae"
+	return [getConfigValue "serverAdminEmail" "webmaster@127.0.0.1"]
+}
+
+proc getShadowIconFilename {} {
+	#debugLog "gsif"
+	return "[getDocumentURL]/shadow.gif"
+}
+
+proc getExpandLinkBeginning {identifier} {
+	global additionalQueryData
+	#debugLog "gelb"
+	puts -nonewline "<a class=\"titlelink\" target=\"_self\"\
+	  href=\"[getActionURL]?pageMode=snippets&topic=$identifier&action=expand_$identifier&$additionalQueryData\">"
+}
+
+proc getSnippetFilename {topic} {
+	#debugLog "gsf"
+	return [concat [getFilePrefix]/users/[getUserName]/$topic]
+}
+
+proc getTextWidth {} {
+	#debugLog "gtw"
+	return [getConfigValue "textWidth" "80"]
+}
+
+proc getTopicName {id} {
+	global metaData
+	#debugLog "gtn"
+	set index 0
+	set shouldContinue 1
+	while {$shouldContinue} {
+		if {$index >= [llength $metaData]} {
+			set shouldContinue 0
+		} else {
+			array set current [lindex $metaData $index]
+			if {$current(identifier) == $id} {
+				if {$current(title) == ""} {
+					return "\[This has not been named. Please name it.\]"
+				} else {
+					#if {[shouldAllowHtmlSnippets] && ![testUserFlag\
+					  #[getUserName] "text"]} {
+						#return [textToHtml $current(title)]
+					#} else {
+						return $current(title)
+					#}
+				return $current(title)
+				}
+			}
+		}
+		incr index
+	}
+	return ""
+}
+
+proc getTopics {} {
+	global metaData
+	#debugLog "gt"
+	readMetaData
+	set result {}
+	for {set index 0} {$index < [llength $metaData]} {incr index} {
+		array set current [lindex $metaData $index]
+		if {$current(identifier) != ""} {
+			lappend result $current(identifier)
+		}
+	}
+	return $result
+}
+
+proc getUserMetaDataFilename {userId} {
+	#debugLog "gumdf"
+	return [concat [getFilePrefix]/users/$userId/metadata]
+}
+
+proc getUserName {} {
+	#debugLog "gun"
+	switch [getProgramMode] {
+		"sidebar" {
+			return "sidebar"
+		}
+		"MagicNotebook" -
+		"snippets" -
+		default {
+			if {[CGIValue login] != ""} {
+				if {[isAdministrator [CGIValue login]]} {
+					if {[CGIValue effectiveUserId] != ""} {
+						return [CGIValue effectiveUserId]
+					}
+					if {"[CGIValue switchUserId]" != ""} {
+						if {"[CGIValue administrativeAction]" == "switchUser"} {
+							if {[userExists [CGIValue switchUserId]]} {
+								return [CGIValue switchUserId]
+							}
+						}
+					}
+				}
+				return [CGIValue login]
+			} elseif {[CGIValue newLogin] != ""} {
+				return [CGIValue newLogin]
+			} else {
+				switch [CGIValue accessMethod] {
+					"wiki" {
+						return [CGIValue accessMethod]
+					}
+					"guest" -
+					default {
+						return "guest"
+					}
+				}
+			}
+		}
+	}
+}
+
+proc getVersionNumber {} {
+    return [getConfigValue "versionNumber" "1.0"]
+}
+
+proc grantAdministrativePriveleges {userId} {
+	global administrativeActionResult
+	#debugLog "gap"
+	if {[setUserFlag "$userId" "administrator"]} {
+		set administrativeActionResult "<p><strong>User $userId\
+			has been granted administrative priveleges.</strong></p>\n"
+	} else {
+		set administrativeActionResult "<p><strong>There was an error\
+			attempting to grant administrative priveleges to\
+			$userId.</strong></p>\n"
+	}
+}
+
+proc hide {id} {
+	global metaData
+	#debugLog "h"
+	readMetaData
+	for {set index 0} {$index < [llength $metaData]} {incr index} {
+		array set current [lindex $metaData $index]
+		if {$current(identifier) == $id} {
+			set current(flags) [clearFlag "$current(flags)" "show"]
+			set current(flags) [setFlag "$current(flags)" "hide"]
+		set metaData [lreplace $metaData $index $index [array get current]]
+		}
+	}
+	writeMetaData 1
+}
+
+proc init {} {
+	global additionalQueryData
+	global administrativeActionResult
+	global collapsedObject
+	global configOptions
+	global debugMode
+	global lockedFiles
+	global metaDataRead
+	global metaDataWritten
+	global pageModeHasBeenCalled
+	global passwordsRead
+	global resultArray
+	global userNotifiedOfLock
+	#One of the following two lines should be uncommented.
+	set debugMode 1
+	#set debugMode 0
+	#debugLog "i"
+	#set debugMode 0
+	 debugLog "Starting processing..."
+	set administrativeActionResult ""
+	set metaDataRead 0
+	set metaDataWritten 0
+	set collapsedObject ""
+	set lockedFiles {}
+	set pageModeHasBeenCalled 0
+	set passwordsRead 0
+	set userNotifiedOfLock 0
+	set configOptions {\
+		"actionURL"\
+        "availableBibleVersions"\
+        "cellpadding"\
+        "defaultBibleVersion"\
+		"documentURL"\
+		"filePrefix"\
+        "includeOldTestamentByDefault"\
+        "includeApocryphaByDefault"\
+        "includeNewTestamentByDefault"\
+        "matchPartialWordsByDefault"\
+		"textWidth"\
+        "versionNumber"\
+		}
+	set additionalQueryData ""
+	set configResult(exists) 1
+	expr srand([clock clicks])
+	puts "Content-type: text/html"
+	puts ""
+	loadConfigFile [getConfigFilename]
+    CGIParse
+    if {[getProgramMode] != "bibletool"} {
+        if {[CGIValue pageMode] == "forgotPassword"} {
+            forgotPassword
+            pageEnd
+            exit 0
+        }
+        getLock [getMetaDataFilename]
+        if {[shouldAuthenticate] && [authenticate]} {
+            readMetaData
+        }
+        if {[CGIValue accessMethod] == "guest"} {
+            registerQueryData "accessMethod" "guest"
+        }
+        if {[CGIValue topic] != ""} {
+            saveSelectedTopic [CGIValue topic]
+        }
+        readPasswords
+        if {[CGIValue shouldsave] == "yes"} {
+            saveSubmittedChanges
+        }
+         debugLog [CGIQuery]
+        if {[shouldAuthenticate]} {
+            if {![authenticate]} {
+                pageStart 0
+                puts -nonewline "\
+                    <p>The e-mail or password you have supplied is incorrect.\n\
+                    Would you like to try again?</p>\n\
+                    <p>E-mail address:<br>\n\
+                    <input type=\"text\" name=\"login\"\
+                    size=\"[getTextWidth]\"></p>\n\
+                    <p>Password:<br>\n\
+                    <input type=\"password\" name=\"password\"\
+                    size=\"[getTextWidth]\"></p>\n\
+                    <p><input type=\"radio\" name=\"pageMode\" value=\"snippets\"\
+                    onclick=\"document.[getProgramMode].submit()\" checked> Log in<br>\n"
+                    if {[shouldAllowLoginCreation]} {
+                        puts -nonewline "\
+                            <input type=\"radio\" name=\"pageMode\"\
+                            value=\"createLogin\"
+                            onclick=\"document.[getProgramMode].submit()\">\
+                            Create a new login<br>\n"
+                    }
+                puts -nonewline "\
+                    <input type=\"radio\" name=\"pageMode\"\
+                    value=\"forgotPassword\"\
+                    onclick=\"document.[getProgramMode].submit()\">\
+                    Help! I forgot my password!</p>\n\
+                    <p><input type=\"image\" name=\"Go!\"\ border=\"0\"
+                    src=\"[getDocumentURL]/submit.jpg\"></p>\n"
+                    #<input type=\"submit\" value=\"Go!\">\n"
+                pageEnd
+                exit 0
+            }
+        }
+        getPageMode
+        writeMetaData 1
+        releaseLock [getMetaDataFilename]
+    }
+    cd [getFilePrefix]
+}
+
+proc isActive {topic} {
+	global metaData
+	#debugLog "ia"
+	set index 0
+	set shouldContinue 1
+	while {$shouldContinue} {
+		array set currentRow [lindex $metaData $index]
+		if {$index >= [llength $metaData]} {
+			set shouldContinue 0
+		} else {
+			if {$currentRow(identifier) == $topic} {
+				switch -regexp -- $currentRow(flags) {
+					show {
+						return 1
+					}
+					default {
+						return 0
+					}
+				}
+			}
+		}
+		incr index
+	}
+	return 0
+}
+
+proc isAdministrator {login} {
+	global passwords
+	#debugLog "ia2"
+	readPasswords
+	set index 0
+	set shouldContinue 1
+	while {$shouldContinue} {
+		array set currentRow [lindex $passwords $index]
+		if {$index >= [llength $passwords]} {
+			set shouldContinue 0
+		} else {
+			if {$currentRow(login) == $login} {
+				switch -regexp -- $currentRow(flags) {
+					administrator {
+						return 1
+					}
+					default {
+						return 0
+					}
+				}
+			}
+		}
+		incr index
+	}
+	return 0
+}
+
+proc isAllowed {option {default 0}} {
+	#debugLog "ia3"
+	return [isTrue [getConfigValue $option $default]]
+}
+
+proc isAncestor {potentialParent potentialChild} {
+	#debugLog "ia4"
+	return [isDescendant $potentialChild $potentialParent]
+}
+
+proc isDescendant {potentialChild potentialParent} {
+	#debugLog "id"
+	set shouldContinue 1
+	set currentNode $potentialChild
+	#debugLog "id0 $potentialChild $potentialParent"
+	#debugLog "id1 [getTopicName $potentialChild] [getTopicName $potentialParent]"
+	while {$shouldContinue} {
+		if {$currentNode == $potentialParent} {
+			return 1
+		}
+		if {$currentNode == "top"} {
+			return 0
+		}
+		if {$currentNode == $potentialChild} {
+			#debugLog "id Node $potentialChild is its own ancestor."
+		}
+		set currentNode [getParent $currentNode]
+	}
+	return 0
+}
+
+proc isFolder {identifier} {
+	#debugLog "if"
+	return [testMetaDataFlag $identifier "folder"]
+}
+
+proc isProperAncestor {potentialParent potentialChild} {
+	#debugLog "ipa"
+	if {$potentialParent != $potentialChild} {
+		return [isAncestor $potentialParent $potentialChild]
+	} else {
+		return 0
+	}
+}
+
+proc isProperDescendant {potentialChild potentialParent} {
+	#debugLog "ipd"
+	return [isProperAncestor $potentialParent $potentialChild]
+}
+
+proc isTopic {identifier} {
+	return [expr ![isFolder $identifier]]
+}
+
+proc isTopicBeingCollapsed {id} {
+	global collapsedObject
+	#debugLog "itbc"
+	if {$collapsedObject == $id} {
+        return 1
+	} else {
+		return 0
+	}
+}
+
+proc isTrue {optionValue} {
+	#debugLog "it"
+	switch [string tolower $optionValue] {
+		true -
+		yes -
+		on -
+		1 {
+			return 1
+		}
+		default {
+			return 0
+		}
+	}
+}
+
+proc isValidLogin {login} {
+	global passwords
+	#debugLog "ivl"
+	readPasswords
+	set index 0
+	set shouldContinue 1
+	while {$shouldContinue} {
+		array set currentRow [lindex $passwords $index]
+		if {$index >= [llength $passwords]} {
+			set shouldContinue 0
+		} else {
+			if {($currentRow(login) == $login)} {
+				return 1
+			}
+		}
+		incr index
+	}
+	return 0
+}
+
+proc lineBreaksToHtml {text} {
+	#debugLog "lbth"
+	set lines [split "\n$text\n" "\n"]
+	set result ""
+	for {set i 0} {$i < [llength $lines]} {incr i} {
+		append result [lindex $lines $i]
+		if {$i < [expr [llength $lines] - 1]} {
+			if {[regexp -- "^\s*$" "[lindex $lines $i]"]} {
+				if {[regexp -- "^\s*$" "[lindex $lines [expr $i + 1]]"]} {
+					append result "\n"
+				} else {
+					append result "\n<p>"
+				}
+			} else {
+				if {[regexp -- "^\s*$" "[lindex $lines [expr $i + 1]]"]} {
+					append result "</p>\n"
+				} else {
+					append result "<br>\n"
+				}
+			}
+		}
+	}
+	return $result
+}
+
+proc listUsers {} {
+	global passwords
+	#debugLog "lu"
+	set breakNeeded 0
+	puts -nonewline "<h2>Users with accounts on this system:</h2>\n<p>"
+	foreach current $passwords {
+		array set currentRow $current
+		if {$breakNeeded} {
+			puts -nonewline "<br>\n"
+		}
+		puts -nonewline "$currentRow(login)"
+		set breakNeeded 1
+	}
+	puts -nonewline "</p>\n\
+		<p><input type=\"radio\" name=\"pageMode\"\
+		value=\"administrative\" onclick=\"document.[getProgramMode].submit()\"\
+		checked> Return to the administrative menu.</p>\n\
+		<p><input type=\"image\" name=\"Go!\"\ border=\"0\"
+		src=\"[getDocumentURL]/submit.jpg\"></p>\n"
+		#<p><input type=\"submit\" value=\"Go!\"></p>\n"
+}
+
+proc logMessage {message} {
+	puts stderr "[getProgramName] \[[clock format [clock seconds]]\]: $message"
+	flush stderr
+}
+
+# New CGI variables should be listed here.
+proc mightBeUsedInFilename {variableName} {
+	#debugLog "mbuif"
+	switch -regexp -- $variableName {
+		"^accountManagement$" -
+		"^administrativeAction$" -
+		"^changePasswordDuplicate" -
+		"^changePasswordOld$" -
+		"^changePasswordNew$" -
+		"^changeUserPasswordPassword$" -
+		"^changeUserPasswordDuplicate$" -
+		"^delete_" -
+		"^header_" -
+		"^newUserPassword$" -
+		"^newUserPasswordDuplicate$" -
+		"^pageMode$" -
+		"^password$" -
+		"^passwordDuplicate$" -
+		"^prefersToUseHtml$" -
+		"^previousPageMode$" -
+		"^shouldAddTemplates$" -
+		"^shouldsave$" -
+		"^title_" -
+		"^value_" {
+			return 0
+		}
+		"^accessMethod$" -
+		"^action$" -
+		"^changeUserPasswordEmail$" -
+		"^deleteUserId$" -
+		"^effectiveUserId$" -
+		"^grantAdministrativePrivelegesUserId$" -
+		"^importttemplate_" -
+		"^lockUserId$" -
+		"^login$" -
+		"^newlogin$" -
+		"^newUserId$" -
+		"^resetUserFromTextOnlyUserId$" -
+		"^revokeAdministrativePrivelegesUserId$" -
+		"^setUserToTextOnlyUserId$" -
+		"^topic$" -
+		"^unlockUserId$" -
+		default {
+			return 1
+		}
+	}
+}
+
+proc moveDown {id} {
+	global metaData
+	#debugLog "md"
+	for {set i 0} {$i < [expr [getNumberOfTopics] - 1]} {incr i} {
+		array set current [lindex $metaData $i]
+		if {$current(identifier) == $id} {
+			set juggle [lindex $metaData [expr $i + 1]]
+			set metaData [lreplace $metaData [expr $i + 1] \
+				[expr $i + 1] [lindex $metaData $i]]
+			set metaData [lreplace $metaData $i $i $juggle]
+			writeMetaData 1
+			return
+		}
+	}
+}
+
+proc moveUp {id} {
+	global metaData
+	#debugLog "mu"
+	for {set i 1} {$i < [getNumberOfTopics]} {incr i} {
+		array set current [lindex $metaData $i]
+		if {$current(identifier) == $id} {
+			set juggle [lindex $metaData [expr $i - 1]]
+			set metaData [lreplace $metaData [expr $i - 1] \
+				[expr $i - 1] [lindex $metaData $i]]
+			set metaData [lreplace $metaData $i $i $juggle]
+			writeMetaData 1
+			return
+		}
+	}
+}
+
+proc pageEnd {} {
+	#debugLog "pe"
+	puts "</form>"
+	readFile [concat [getFilePrefix]/general/footer]
+}
+
+proc pageStart {{preserveLogin 1}} {
+	#debugLog "ps"
+	readFile [concat [getFilePrefix]/general/header]
+    puts "<!-- [getProgramMode] version number [getVersionNumber] -->"
+	# For MagicNotebook we use get.
+	#puts "<form method=\"post\" action=\"[getActionURL]\" name=\"[getProgramMode]\" target=\"_self\">"
+	puts "<form method=\"get\" action=\"[getActionURL]\" name=\"[getProgramMode]\" target=\"_self\">"
+	puts "<input type=\"hidden\" name=\"previousPageMode\"\
+		value=\"[getPageMode]\">"
+	registerQueryData "previousPageMode" [getPageMode]
+	if {[CGIExists administrative]} {
+		puts "<input type=\"hidden\" name=\"administrative\" value=\"true\">"
+		registerQueryData "administrative" "true"
+	}
+	if {$preserveLogin} {
+		if {[CGIValue login] != "" && [authenticate]} {
+			puts "<input type=\"hidden\" name=\"login\" value=\"[CGIValue\
+				login]\">"
+			registerQueryData "login" [CGIValue login]
+		}
+		if {([CGIValue changePasswordNew] != "") &&\
+			([CGIValue changePasswordNew] == \
+			[CGIValue changePasswordDuplicate])} {
+			puts "<input type=\"hidden\" name=\"password\"\
+				value=\"[CGIValue changePasswordNew]\">"
+			registerQueryData "password" [CGIValue changePasswordNew]
+		} else {
+			if {[CGIValue password] != "" && [authenticate]} {
+				puts "<input type=\"hidden\" name=\"password\"\
+					value=\"[CGIValue password]\">"
+				registerQueryData "password" [CGIValue password]
+			}
+		}
+		if {[CGIValue effectiveUserId] != "" && [authenticate]\
+			&& [isAdministrator [CGIValue login]]} {
+			puts "<input type=\"hidden\" name=\"effectiveUserId\"\
+				value=\"[CGIValue effectiveUserId]\">"
+			registerQueryData "effectiveUserId" [CGIValue effectiveUserId]
+		}
+		if {[CGIValue switchUserId] != "" && [authenticate]\
+			&& [isAdministrator [CGIValue login]]} {
+			puts "<input type=\"hidden\" name=\"effectiveUserId\"\
+				value=\"[CGIValue switchUserId]\">"
+			registerQueryData "effectiveUserId" [CGIValue switchUserId]
+		}
+	}
+}
+
+proc panic {} {
+	global lockedFiles
+	#debugLog "p"
+	while {[llength $lockedFiles] > 0} {
+		releaseLock [lindex $lockedFiles 0]
+	}
+	puts "<h1>Panicking... (Sorry!)</h1>"
+	pageEnd
+	exit 1
+}
+
+proc printHeader {topic} {
+	#debugLog "ph"
+	puts "[filterText [removeComments [getHeader $topic]]]"
+}
+
+proc printSnippet {topic} {
+	#debugLog "ps"
+	puts "[filterText [removeComments [selectSnippet $topic]]]"
+}
+
+proc printTopicName {topic} {
+	#debugLog "ptn"
+	puts "<h2>[getTopicName $topic]</h2>"
+}
+
+proc processAccountManagement {} {
+	global accountManagementResult
+	#debugLog "pam"
+	switch -exact -- [CGIValue "accountManagement"] {
+		"addTemplates" {
+			addTemplates
+			set accountManagementResult "<p><strong>The template(s) you\
+				selected have been added.</strong></p>"
+		}
+		"changePassword" {
+			switch -exact [getProgramMode] {
+				sidebar {
+					set userName [CGIValue login]
+				}
+				snippets -
+				default {
+					set userName [getUserName]
+				}
+			}
+			if {[authenticateInternal $userName\
+				[CGIValue changePasswordOld]]} {
+				if {[changePassword $userName [CGIValue changePasswordNew]\
+					[CGIValue changePasswordDuplicate]]} {
+					set accountManagementResult "<p><strong>You have\
+						successfully changed your password.</strong></p>"
+				} else {
+					set accountManagementResult "<p><strong>An error occurred,\
+						so your password is the old value.</strong></p>"
+				}
+			}
+		}
+		"modifyConciseness" {
+			if {[isTrue [CGIValue conciseDisplay]]} {
+				setUserFlag [getUserName] "concise"
+				set accountManagementResult "<p><strong>The Magic Notebook\
+				  will now close down things you aren't using.</strong></p>"
+			} else {
+				clearUserFlag [getUserName] "concise"
+				set accountManagementResult "<p><strong>If you open something,\
+				  the Magic Notebook will now leave it open until you close
+				  it.</strong></p>"
+			}
+		}
+		"modifyEditSnippetStatus" {
+			if {[isTrue [CGIValue editSnippets]]} {
+				setUserFlag [getUserName] "editsnippets"
+				set accountManagementResult "<p><strong>You can now add random\
+				  text to topics.</strong></p>"
+			} else {
+				clearUserFlag [getUserName] "editsnippets"
+				set accountManagementResult "<p><strong>When you edit a\
+				  topic, you won't be bothered with controls to add random\
+				  text.</strong></p>"
+			}
+		}
+		"modifyLinkStatus" {
+			if {[isTrue [CGIValue editLinks]]} {
+				setUserFlag [getUserName] "editlink"
+				set accountManagementResult "<p><strong>Clicking on the name of
+				  a topic will now edit it.</strong></p>"
+			} else {
+				clearUserFlag [getUserName] "editlink"
+				set accountManagementResult "<p><strong>Clicking on the name of
+				  a topic will now open or close it.</strong></p>"
+			}
+		}
+		"updateHTMLPreference" {
+			if {[CGIValue prefersToUseHtml] != ""} {
+				setUserFlag [getUserName] "html"
+			} else {
+				clearUserFlag [getUserName] "html"
+			}
+		}
+	}
+	writeMetaData 1
+}
+
+proc processAdministrativeAction {} {
+	global administrativeActionResult
+	#debugLog "paa"
+	if {[isAdministrator [CGIValue "login"]]} {
+		switch -exact -- [CGIValue "administrativeAction"] {
+			"addUser" {
+				set newUserId [CGIValue "newUserId"]
+				set newUserPassword [CGIValue "newUserPassword"]
+				set newUserPasswordDuplicate [CGIValue\
+					"newUserPasswordDuplicate"]
+				if {[addUser "$newUserId" "$newUserPassword"\
+					"$newUserPasswordDuplicate"]} {
+					set administrativeActionResult "<p><strong>New user\
+						[CGIValue newUserId] successfully
+						created.</strong></p>\n"
+				} else {
+					set administrativeActionResult "<p><strong>An error\
+						occurred in attempting to add user [CGIValue\
+						newUserId].</strong></p>\n"
+				}
+			}
+			"changeUserPassword" {
+				if {[changePassword [CGIValue changeUserPasswordEmail]\
+					[CGIValue changeUserPasswordPassword]\
+					[CGIValue changeUserPasswordDuplicate]]} {
+					set administrativeActionResult "<p><strong>Password\
+						successfully changed for [CGIValue\
+						changeUserPasswordEmail].</strong></p>\n"
+				} else {
+					set administrativeActionResult "<p><strong>Error: password\
+						not successfully changed.</strong></p>\n"
+				}
+			}
+			"deleteUser" {
+				deleteUser [CGIValue deleteUserId]
+			}
+			"grantAdministrativePriveleges" {
+				grantAdministrativePriveleges [CGIValue\
+					grantAdministrativePrivelegesUserId]
+			}
+			"revokeAdministrativePriveleges" {
+				revokeAdministrativePriveleges [CGIValue\
+					revokeAdministrativePrivelegesUserId]
+			}
+			"lockUser" {
+				if {[setUserFlag [CGIValue lockUserId] "locked"]} {
+					set administrativeActionResult "<p><strong>User
+						<em>[CGIValue lockUserId]</em> is now\
+						locked.</strong></p>\n"
+				} else {
+					set administrativeActionResult "<p><strong>An error\
+						occurred in attempting to lock user <em>[CGIValue\
+						lockUserId]</em>.<strong></p>\n"
+				}
+			}
+			"unlockUser" {
+				if {[clearUserFlag [CGIValue unlockUserId] "locked"]} {
+					set administrativeActionResult "<p><strong>User\
+						<em>[CGIValue unlockUserId]</em> is now\
+						unlocked.</strong></p>\n"
+				} else {
+					set administrativeActionResult "<p><strong>An error\
+						occurred in attempting to unlock user <em>[CGIValue\
+						unlockUserId]</em>.<strong></p>\n"
+				}
+			}
+			"setUserToTextOnly" {
+				if {[setUserFlag [CGIValue setUserToTextOnlyUserId] "text"]} {
+					set administrativeActionResult "<p><strong>User\
+						<em>[CGIValue setUserToTextOnlyUserId]</em> is now set\
+						to text-only viewing.<strong></p>\n"
+				} else {
+					set administrativeActionResult "<p><strong>An error\
+						occurred in attempting to set user <em>[CGIValue\
+						setUserToTextOnlyUserId]</em> to text-only\
+						viewing.</strong></p>\n"
+				}
+			}
+			"resetUserFromTextOnly" {
+				if {[clearUserFlag [CGIValue resetUserFromTextOnlyUserId]\
+					"text"]} {
+					set administrativeActionResult "<p><strong>User\
+						<em>[CGIValue resetUserFromTextOnlyUserId]</em> is no\
+						longer set to text-only viewing.</strong></p>\n"
+				} else {
+					set administrativeActionResult "<p></strong>An error\
+						occurred in attempting to set user <em>[CGIValue\
+						resetUserFromTextOnlyUserId]</em> to no longer have\
+						text-only viewing.</strong></p>\n"
+				}
+			}
+		}
+	} else {
+		logMessage "Non-administrative user somehow got into\
+			processAdministrativeAction."
+	}
+}
+
+proc quoteHtmlMetacharacters {toQuote} {
+	#debugLog "qhm"
+	regsub -all "&" "$toQuote" "\\&amp;" toQuote
+	regsub -all "<" "$toQuote" "\\&lt;" toQuote
+	regsub -all ">" "$toQuote" "\\&gt;" toQuote
+	return $toQuote
+}
+
+proc readFile {filename} {
+	#debugLog "rf"
+	if { [catch {open $filename r} fileId] } {
+		logMessage "Couldn't open file $filename. Exiting from readFile..."
+		panic
+	} else {
+		puts [read $fileId]
+		close $fileId
+	}
+}
+
+proc readMetaData {{shouldForce 0}} {
+	global metaData
+	global metaDataRead
+	#debugLog "rmd"
+	if {$metaDataRead && !$shouldForce} {
+		return
+	}
+	set metaData [readUserMetaData [getUserName] $shouldForce]
+	set metaDataRead 1
+}
+
+proc readUserMetaData {userId {shouldForce 0}} {
+	#debugLog "rumd"
+	set metaData {}
+	if { [catch {open [getUserMetaDataFilename $userId] r} fileId] } {
+		if { [catch {open [getUserMetaDataFilename $userId] w} fileId] } {
+			close $fileId
+			return {}
+		}
+	} else {
+		set shouldContinue 1
+		if {[eof $fileId]} {
+			set shouldContinue 0
+		}
+		while {$shouldContinue} {
+			set currentRow(identifier) [readNextField $fileId]
+			if {[eof $fileId]} {
+				set shouldContinue 0
+			}
+			set currentRow(title) [readNextField $fileId]
+			if {[eof $fileId]} {
+				set shouldContinue 0
+			}
+			set currentRow(header) [readNextField $fileId]
+			if {[eof $fileId]} {
+				set shouldContinue 0
+			}
+			set currentRow(flags) [readNextField $fileId]
+			if {[eof $fileId]} {
+				set shouldContinue 0
+			}
+			set currentRow(parent) [readNextField $fileId]
+			if {$shouldContinue} {
+				lappend metaData [array get currentRow]
+			}
+			gets $fileId
+			if { [eof $fileId] } {
+				set shouldContinue 0
+			}
+		}
+		close $fileId
+	}
+	return $metaData
+}
+
+proc readNextField {fileId} {
+	#debugLog "rnf"
+	set padding ""
+	set padding " "
+	while {$padding != "\"" && $padding != ""} {
+		set padding [read $fileId 1]
+	}
+	return [readString $fileId]
+}
+
+proc readPasswords {{shouldForce 0}} {
+	global passwords
+	global passwordsRead
+	#debugLog "rp [getPasswordFilename]"
+	if {$passwordsRead && !$shouldForce} {
+		return
+	}
+	if { [catch {open [getPasswordFilename] r} fileId] } {
+		if { [catch {open [getPasswordFilename] w} fileId] } {
+			close $fileId
+			return {}
+		}
+	} else {
+		set shouldContinue 1
+		if {[eof $fileId]} {
+			set shouldContinue 0
+		}
+		while {$shouldContinue} {
+			set currentRow(login) [readNextField $fileId]
+			if {[eof $fileId]} {
+				set shouldContinue 0
+			}
+			set currentRow(password) [readNextField $fileId]
+			if {[eof $fileId]} {
+				set shouldContinue 0
+			}
+			set currentRow(flags) [readNextField $fileId]
+			if {[eof $fileId]} {
+				set shouldContinue 0
+			}
+			set currentRow(parent) [readNextField $fileId]
+			if {$shouldContinue} {
+				lappend passwords [array get currentRow]
+			}
+			gets $fileId
+			if { [eof $fileId] } {
+				set shouldContinue 0
+			}
+		}
+		close $fileId
+		set passwordsRead 1
+	}
+}
+
+# When a file with pickled strings has been opened, and the opening quotation
+# mark for a string has been encountered, read from the stream until the
+# closing quotation mark has been encountered.  '\' escapes the next character;
+# this behavior is simplified from usual escape quotation.
+proc readString {fileId} {
+	set shouldContinue 1
+	set result ""
+	#debugLog "rs"
+	while {$shouldContinue} {
+		set currentCharacter [read $fileId 1]
+		switch -exact -- $currentCharacter {
+			"" {
+				set shouldContinue 0
+			}
+			"\"" {
+				set shouldContinue 0
+			}
+			"\\" {
+				set result "$result[read $fileId 1]"
+			}
+			default {
+				set result "$result$currentCharacter"
+			}
+		}
+	}
+	return $result
+}
+
+proc readTopic {filename} {
+	#debugLog "rt"
+	global topics
+	if {[getProgramMode] == "MagicNotebook" && [testMetaDataFlag $filename\
+	  "folder"]} {
+		# We don't display this way.
+		return {}
+	}
+	set result {}
+	set fullFilename "[getFilePrefix]/users/[getUserName]/$filename"
+	if { [catch {open $fullFilename r} fileId] } {
+		# The topic has just been deleted or is otherwise available.
+		return {}
+	} else {
+		set shouldContinue 1
+		while {$shouldContinue} {
+			set currentField [readNextField $fileId]
+			if {[string length $currentField] > 0} {
+				lappend result $currentField
+			}
+			gets $fileId
+			if { [eof $fileId] } {
+				set shouldContinue 0
+			}
+		}
+		close $fileId
+	}
+	return $result
+}
+
+proc registerQueryData {field value} {
+	global additionalQueryData
+	#debugLog "rqd"
+	regsub -all "@" "$field" "%40" field
+	regsub -all "@" "$value" "%40" value
+	if {$additionalQueryData == ""} {
+		set additionalQueryData "$field=$value"
+	} else {
+		set additionalQueryData "$additionalQueryData&$field=$value"
+	}
+}
+
+proc registerLock {filename} {
+	global lockedFiles
+	#debugLog "rl"
+	if {[lsearch -exact $lockedFiles $filename] == -1} {
+		lappend lockedFiles $filename
+	}
+}
+
+proc releaseLock {filename} {
+	#debugLog "rl2"
+	deregisterLock $filename
+	file delete "$filename.lock"
+}
+
+proc removeComments {stringWithComments} {
+	#debugLog "rc"
+	set result ""
+	set lines [split $stringWithComments "\n"]
+	foreach currentLine $lines {
+		if {[regexp "^#" $currentLine]} {
+			#It's a comment--doesn't need to be displayed.
+		} else {
+			if {$result != ""} {
+				set result "$result\n$currentLine"
+			} else {
+				set result "$currentLine"
+			}
+		}
+	}
+	return $result
+}
+
+# Hasn't fully been debugged.  Could be overprotective.
+proc removeShellMetacharacters {untrusted} {
+	#debugLog "rsm"
+	set result "$untrusted"
+	regsub -all \[\!\\\$\^\\\&\\\*\(\)\~\\\[\\\]\\\\\|\{\}\`\"\'\;\<\>\?\#\]\
+		$result "" result
+	return $result
+}
+
+proc retrievePassword {} {
+	#debugLog "rp"
+	set login [CGIValue login]
+	if { [isValidLogin $login ] } {
+		set password [getPassword $login]
+		if { [catch {open "| [getMailerCommand $login]" r+} pipeId] } {
+			puts -nonewline "<p>We're sorry, but we weren't able to mail you\
+				your password.  Please contact the <a\
+				href=\"mailto:[getServerAdminEmail]\">administrator</a> and\
+				inform him of the problem.</p>\n"
+		} else {
+			puts -nonewline $pipeId "From: [getProgramName]\
+				<[getServerAdminEmail]>\
+				\nTo: $login\
+				\nSubject: Your [getProgramName] password\
+				\n\nDear [getProgramName] Visitor;\
+				\n\nYour [getProgramName] password at [getFullBaseURL]\
+				\nis \"$password\".  (Your login is the e-mail address you\
+				used, \n\"$login\".)  We look forward to having you back.\
+				\n\
+				\nIf you were not expecting a password reminder, please\
+				disregard this message.\n\
+				\n\
+				\n\
+				\nSincerely (for a computer program),\
+				\n[getProgramName]\n"
+			close $pipeId
+			#if { [ catch {close $pipeId} ] } {
+				#puts -nonewline "<p>We're sorry, but we weren't able to mail\
+					#you your password.  Please contact the <a\
+					#href=\"mailto:[getServerAdminEmail]\">administrator</a>\
+					#and inform him of the problem.</p>\n"
+			#} else {
+			puts -nonewline "<p>Your password has been e-mailed to you and\
+				should arrive shortly.  When it does, you should be able\
+				to log in:</p>\n"
+			displayLogin
+			#}
+			#logMessage "$::errorInfo"
+		}
+	} else {
+		puts -nonewline "<p>We're sorry, but we were unable to look up your\	
+			account name.  You might have made a minor typo, or have an\
+			account with a different server that looks like this one.  Would\
+			you like to try to log in again?</p>\n"
+		displayLogin
+		pageEnd
+		exit 0
+	}
+}
+
+proc revokeAdministrativePriveleges {userId} {
+	global administrativeActionResult
+	#debugLog "rap"
+	if {[clearUserFlag "$userId" "administrator"]} {
+		set administrativeActionResult "<p><strong>User $userId\
+			has been had administrative priveleges revoked.</strong></p>\n"
+	} else {
+		set administrativeActionResult "<p><strong>There was an error\
+			attempting to revoke administrative priveleges for\
+			$userId.</strong></p>\n"
+	}
+}
+
+proc sanitizePotentialFilenameElement {untrusted} {
+	#debugLog "spfe"
+	set result $untrusted
+	regsub -all "/" $result "" result
+	regsub -all "\n" $result "" result
+	return $result
+}
+
+proc saveSelectedTopic {identifier} {
+	global metaData
+	#debugLog "sst"
+	readMetaData
+	set index 0
+	set shouldContinue 1
+	while {$shouldContinue} {
+		array set currentRow [lindex $metaData $index]
+		if {$index >= [llength $metaData]} {
+			set shouldContinue 0
+		} else {
+			if {$currentRow(identifier) == $identifier} {
+				set currentRow(flags) [setFlag "$currentRow(flags)"\
+					"selected"]
+				set metaData [lreplace $metaData $index $index [array\
+					get currentRow]]
+			} else {
+				set currentRow(flags) [clearFlag "$currentRow(flags)"\
+					"selected"]
+				set metaData [lreplace $metaData $index $index [array\
+					get currentRow]]
+			}
+		}
+		incr index
+	}
+	writeMetaData 1
+	if {[shouldExpandOnlySelected]} {
+		collapseAllSiblingsOfAncestors $identifier
+		if {[getSelectedTopic] == $identifier &&
+		  ![isTopicBeingCollapsed $identifier]} {
+			expand $identifier
+			#expandOnlyNodeAndAllParents $identifier
+		} else {
+			collapse $identifier
+			#expandOnlyNodeAndAllParents [getParent $identifier]
+		}
+	}
+}
+
+proc saveSubmittedChanges {} {
+	global metaData
+	#debugLog "saveSubmittedChanges"
+	readMetaData 1
+	set previous [CGIValue previousPageMode]
+	set topic [CGIValue topic]
+	getLock "[getFilePrefix]/users/[getUserName]/$topic"
+	set topicContents [readTopic $topic]
+	foreach key [CGIKeys] {
+		switch -regexp $key {
+			{^title_(.*)$} {
+				regexp {^(.*?)_(.*)$} $key match prefix id
+				set index 0
+				set shouldContinue 1
+				while {$shouldContinue} {
+					if {$index >= [llength $metaData]} {
+						set shouldContinue 0
+					} else {
+						array set current [lindex $metaData $index]
+						if {$current(identifier) == $id} {
+							set current(title) [CGIValue $key]
+							set metaData [lreplace $metaData $index\
+								$index [array get current]]
+						}
+					}
+					incr index
+				}
+			}
+			{^header_(.*)$} {
+				regexp {^(.*?)_(.*)$} $key match prefix id
+				set index 0
+				set shouldContinue 1
+				while {$shouldContinue} {
+					if {$index >= [llength $metaData]} {
+						set shouldContinue 0
+					} else {
+						array set current [lindex $metaData $index]
+						if {$current(identifier) == $id} {
+							set current(header) [CGIValue $key]
+							set metaData [lreplace $metaData $index\
+								$index [array get current]]
+						}
+					}
+					incr index
+				}
+			}
+			{^value_(.*)_(.*?)$} {
+				regexp {^(.*?)_(.*)_(.*?)$} $key match prefix id position
+				if { [CGIValue $key] != ""} {
+					if {$position < [llength $topicContents]} {
+						set topicContents [lreplace $topicContents $position\
+							$position [CGIValue $key]]
+					} else {
+						lappend topicContents [CGIValue $key]
+					}
+				} else {
+					if {$position < [llength $topicContents]} {
+						set topicContents [lreplace $topicContents $position\
+							$position [getDeletionMarker]]
+					}
+				}
+			}
+			{^delete_(.*)$} {
+				regexp {^(.*?)_(.*)_(.*?)$} $key match prefix id sequence
+				set topicContents [lreplace $topicContents $position\
+					$position [getDeletionMarker]]
+			}
+		}
+	}
+	for {set index 0} {$index < [llength $topicContents]} {} {
+		if { [lindex $topicContents $index] == [getDeletionMarker]} {
+			set topicContents [lreplace $topicContents $index $index]
+		} else {
+			incr index
+		}
+	}
+	releaseLock "[getFilePrefix]/users/[getUserName]/$topic"
+	writeMetaData
+	writeTopic $topic $topicContents
+}
+
+proc selectSnippet {topic} {
+	#debugLog "ss"
+	set topicContents [readTopic $topic]
+	set topicIndex [expr int( rand() * [llength $topicContents] ) ]
+	return [lindex $topicContents $topicIndex]
+}
+
+proc selectTopic {identifier} {
+	global metaData
+	#debugLog "st"
+	readMetaData
+	set index 0
+	set shouldContinue 1
+	while {$shouldContinue} {
+		array set currentRow [lindex $metaData $index]
+		if {$index >= [llength $metaData]} {
+			set shouldContinue 0
+		} else {
+			if {$currentRow(identifier) == $identifier} {
+				set currentRow(flags) [setFlag "$currentRow(flags)"\
+					"selected"]
+			} else {
+				set currentRow(flags) [clearFlag "$currentRow(flags)"\
+				    "selected"]
+			}
+			set metaData [lreplace $metaData $index $index [array\
+				get currentRow]]
+		}
+		incr index
+	}
+	writeMetaData
+}
+
+proc setFlag {target flag} {
+	#debugLog "sf"
+	if {[regexp -- "$flag" "$target"]} {
+	} else {
+		set target "$target $flag"
+		regsub -all {\s+} $target { } target
+	}
+	return $target
+}
+
+proc setUserFlag {userId flag} {
+	global passwords
+	#debugLog "suf"
+	getLock [getPasswordFilename]
+	readPasswords
+	if {[userExists $userId]} {
+		set index 0
+		set shouldContinue 1
+		while {$shouldContinue} {
+			array set currentRow [lindex $passwords $index]
+			if {$index >= [llength $passwords]} {
+				set shouldContinue 0
+			} else {
+				if {$currentRow(login) == $userId} {
+					set currentRow(flags) [setFlag "$currentRow(flags)"\
+						"$flag"]
+					set passwords [lreplace $passwords $index $index [array\
+						get currentRow]]
+					writePasswords
+					releaseLock [getPasswordFilename]
+					return 1
+				}
+			}
+			incr index
+		}
+	}
+	releaseLock [getPasswordFilename]
+	return 0
+}
+
+proc shouldAllowGuestAccess {} {
+	#debugLog "saga"
+	return [isAllowed "shouldAllowGuestAccess"]
+}
+
+proc shouldAllowHtmlSnippets {} {
+	#debugLog "sahs"
+	return [isAllowed "shouldAllowHtmlSnippets" 1]
+}
+
+proc shouldAllowLoginAccess {} {
+	#debugLog "sala"
+	return [isAllowed "shouldAllowLoginAccess"]
+}
+
+proc shouldAllowLoginCreation {} {
+	#debugLog "salc"
+	return [isAllowed "shouldAllowLoginCreation"]
+}
+
+proc shouldAllowSidebarAccess {} {
+	#debugLog "sasa"
+	return [isAllowed "shouldAllowSidebarAccess" 1]
+}
+
+proc shouldAllowWikiAccess {} {
+	#debugLog "sawa"
+	return [isAllowed "shouldAllowWikiAccess"]
+}
+
+proc shouldAuthenticate {} {
+	#debugLog "sa"
+	switch -- [getPageMode] {
+		connect -
+		createLogin -
+		entryMenu -
+		retrievePassword {
+			return 0
+		}
+		default {
+			switch -- [CGIValue accessMethod] {
+				guest -
+				wiki {
+					return 0
+				}
+				default {
+					return 1
+				}
+			}
+		}
+	}
+}
+
+proc shouldExpandOnlySelected {} {
+	#debugLog "seos"
+	return [testUserFlag [getUserName] "concise"]
+}
+
+proc shouldPresentChoiceBetweenConcordanceAndPassageLookup {} {
+    #debugLog shouldPresentChoiceBetweenConcordanceAndPassageLookup
+    return 0
+}
+
+proc show {id} {
+	#debugLog "s"
+	global metaData
+	for {set index 0} {$index < [llength $metaData]} {incr index} {
+		array set current [lindex $metaData $index]
+		if {$current(identifier) == $id} {
+			set current(flags) [clearFlag "$current(flags)" "hide"]
+			set current(flags) [setFlag "$current(flags)" "show"]
+			set metaData [lreplace $metaData $index $index [array get current]]
+		}
+	}
+	writeMetaData 1
+}
+
+proc showFrames {} {
+    #debugLog "showFrames"
+    #puts -nonewline "Content-type: text/html\n\n"
+    puts -nonewline "<title>The Powered Access Bible</title>\n"
+    puts -nonewline "<link rel=\"icon\" href=\"/favicon.ico\"\
+        type=\"image/x-icon\">\n\
+        <link rel=\"shortcut icon\" href=\"/favicon.ico\"\
+        type=\"image/x-icon\">\n"
+    puts -nonewline "<frameset cols=\"*,*\" "
+    #puts -nonewline "<frameset cols=\"40,60\" "
+    puts -nonewline "frameborder=\"0\" frameborder=\"no\" framespacing=\"0\"\
+        border=\"0\">\n\
+        <frame src=\"[getActionURL]?lookupMode=concordance\"\
+        name=\"concordance\">\n\
+        <frame src=\"[getActionURL]?lookupMode=passage\" name=\"passage\">\n\
+        </frameset>\n"
+    puts -nonewline "<noframes>\n\
+        <h1>The Powered Access Bible:</h1>\n\
+        <p><a\
+        href=\"[getActionURL]?lookupMode=concordance\">Concordance</a><br>\n\
+        <a href=\"[getActionURL]?lookupMode=passage\">Passage Lookup</a></p>\n"
+}
+
+proc showMagicNotebook {} {
+	#debugLog "smn"
+	displayForParent "top"
+}
+
+proc showSnippets {} {
+	#debugLog "ss"
+	foreach {topic} [getTopics] {
+		if {[isActive $topic]} {
+			if {[getProgramMode] != "sidebar"} {
+				printTopicName $topic
+			}
+			printHeader $topic
+			printSnippet $topic
+		}
+	}
+}
+
+proc showTemplates {} {
+	#debugLog "st"
+	if {[userExists template]} {
+		set templateMetaData [readUserMetaData template]
+		puts -nonewline "<strong>"
+		if {[llength $templateMetaData] > 0} {
+			set shouldAddBreak 0
+			foreach current $templateMetaData {
+				array set currentRow $current
+				if {![topicExists $currentRow(identifier)]} {
+					if {$shouldAddBreak} {
+						puts -nonewline "<br>\n"
+					}
+					puts -nonewline "<input type=\"checkbox\"\
+						name=\"importtemplate_$currentRow(identifier)\">\
+						$currentRow(title)"
+					set shouldAddBreak 1
+				}
+			}
+		}
+		puts -nonewline "</strong>"
+	}
+}
+
+proc testFlag {target flags} {
+	#debugLog "tf"
+	if {[regexp -- "$flags" "$target"]} {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+proc testMetaDataFlag {identifier flagName} {
+	global metaData
+	#debugLog "tmdf"
+	foreach currentPacked $metaData {
+		array set currentUnpacked $currentPacked
+		if {$currentUnpacked(identifier) == $identifier} {
+			return [testFlag $currentUnpacked(flags) $flagName]
+		}
+	}
+	return 0
+}
+
+proc testUserFlag {userId flag} {
+	global passwords
+	#debugLog "tuf"
+	readPasswords
+	if {[userExists $userId]} {
+		set index 0
+		set shouldContinue 1
+		while {$shouldContinue} {
+			array set currentRow [lindex $passwords $index]
+			if {$index >= [llength $passwords]} {
+				set shouldContinue 0
+			} else {
+				if {$currentRow(login) == $userId} {
+					if {[regexp -- "$flag" "$currentRow(flags)"]} {
+						return 1
+					} else {
+						return 0
+					}
+				}
+			}
+			incr index
+		}
+	}
+	return 0
+}
+
+proc textToHtml {text} {
+	#debugLog "tth"
+	return [lineBreaksToHtml [quoteHtmlMetacharacters $text]]
+}
+
+proc topicExists {topicId} {
+	global metaData
+	#debugLog "te"
+	set index 0
+	set shouldContinue 1
+	readMetaData
+	while {$shouldContinue} {
+		if {$index >= [llength $metaData]} {
+			set shouldContinue 0
+		} else {
+			array set currentRow [lindex $metaData $index]
+			if {$currentRow(identifier) == $topicId} {
+				return 1
+			}
+		}
+		incr index
+	}
+	return 0
+}
+
+proc updateDisplayedData {} {
+	global metaData
+	global collapsedObject
+	global expandedObject
+	#debugLog "udd"
+	readMetaData
+	set action [CGIValue action]
+	set notebookMove [CGIValue notebookMove]
+	if {$notebookMove == ""} {
+		set notebookMove [CGIValue motion]
+	}
+	switch -regexp $notebookMove {
+		{^(.*?)_(.*?)_(.*)$} {
+			regexp {^(.*?)_(.*?)_(.*)$} $notebookMove match moveLikeCommand item \
+			  destination
+			switch -exact -- $moveLikeCommand {
+				motion -
+				notebookMove {
+					for {set index 0} {$index < [llength $metaData]} \
+					  {incr index} {
+						array set current [lindex $metaData $index]
+						if {$current(identifier) == $item} {
+							set current(parent) $destination
+							set metaData [lreplace $metaData $index $index\
+							  [array get current]]
+							writeMetaData 1
+						}
+					}
+				}
+				default {
+				}
+			}
+		}
+	}
+	switch -regexp $action {
+		{^(.*?)_(.*)$} {
+			regexp {^(.*?)_(.*)$} $action match updateCommand actionObject
+			switch -exact -- $updateCommand {
+				collapse {
+					collapse $actionObject
+					set collapsedObject $actionObject
+				}
+				deletefolder {
+					deleteFolder $actionObject
+				}
+				deletetopic {
+					deleteTopic $actionObject
+				}
+				expand {
+					expand $actionObject
+					set expandedObject $actionObject
+				}
+			}
+		}
+	}
+}
+
+proc userExists {login} {
+	global passwords
+	#debugLog "ue"
+	switch -- $login {
+		guest -
+		wiki {
+			return 1
+		}
+		default {
+			set index 0
+			set shouldContinue 1
+			while {$shouldContinue} {
+				if {$index >= [llength $passwords]} {
+					set shouldContinue 0
+				} else {
+					array set currentRow [lindex $passwords $index]
+					if {$currentRow(login) == $login} {
+						return 1
+					}
+				}
+				incr index
+			}
+			return 0
+		}
+	}
+}
+
+proc welcomeScreen {login password} {
+	#debugLog "ws1"
+	puts -nonewline "<input type=\"hidden\" name=\"login\" value=\"$login\">\n\
+		<input type=\"hidden\" name=\"password\" value=\"$password\">\n"
+	registerQueryData "login" $login
+	registerQueryData "password" $password"
+	readFile [concat [getFilePrefix]/general/welcome]
+	if {[getPageMode] != "MagicNotebook"} {
+		if {[userExists "template"]} {
+			puts -nonewline "<p>You may, if you are interested, include\
+				existing snippet collections in your account--you are free to\
+				adjust them, if you do so.  Please check what you are\
+				interested in:</p>\n<p>"
+			showTemplates
+			puts -nonewline "</p>"
+		}
+	}
+	puts -nonewline "<p><input type=\"hidden\" name=\"pageMode\"\
+		value=\"snippets\">\n\
+		<input type=\"hidden\" name=\"shouldAddTemplates\" value=\"yes\">\n\
+		<input type=\"image\" name=\"Continue\"\ border=\"0\"
+		src=\"[getDocumentURL]/submit.jpg\"></p>\n"
+	registerQueryData "pageMode" "snippets"
+	registerQueryData "shouldAddTemplates" "yes"
+		#<input type=\"submit\" value=\"Continue\"></p>\n"
+	# Possibly add includable topics.
+	#puts -nonewline "<p><input type=\"radio\" name=\"pageMode\"\
+		#value=\"metaSnippets\" onclick=\"document.[getProgramMode].submit()\" checked>\
+		#Edit the [getProgramName]<br>\n\
+		#<input type=\"submit\" value=\"Go!\">"
+}
+
+proc writeMetaData {{shouldForce 0}} {
+	global metaData
+	global metaDataRead
+	global metaDataWritten
+	#debugLog "wmd"
+	if {$metaDataRead && ($shouldForce || !$metaDataWritten)} {
+		set metaDataWritten 1
+		if { [catch {open [getMetaDataFilename] w} fileId] } {
+			logMessage "Couldn't open file [getMetaDataFilename]. Exiting from writeMetaData..."
+			panic
+		} else {
+			set index 0
+			set shouldContinue 1
+			while {$shouldContinue} {
+				array set currentRow [lindex $metaData $index]
+				if {$index >= [llength $metaData]} {
+					set shouldContinue 0
+				} else {
+					writeString $fileId $currentRow(identifier)
+					puts -nonewline $fileId " "
+					writeString $fileId $currentRow(title)
+					puts -nonewline $fileId " "
+					writeString $fileId $currentRow(header)
+					puts -nonewline $fileId " "
+					writeString $fileId $currentRow(flags)
+					puts -nonewline $fileId " "
+					writeString $fileId $currentRow(parent)
+					puts $fileId ""
+				}
+				incr index
+			}
+			close $fileId
+		}
+	}
+}
+
+proc writePasswords {} {
+	global passwords
+	#debugLog "wp"
+	if { [catch {open [getPasswordFilename] w} fileId] } {
+		logMessage "Couldn't open file [getPasswordFilename]. Exiting from writePasswords..."
+		panic
+	} else {
+		set index 0
+		set shouldContinue 1
+		while {$shouldContinue} {
+			array set currentRow [lindex $passwords $index]
+			if {$index >= [llength $passwords]} {
+				set shouldContinue 0
+			} else {
+				writeString $fileId $currentRow(login)
+				puts -nonewline $fileId " "
+				writeString $fileId $currentRow(password)
+				puts -nonewline $fileId " "
+				writeString $fileId $currentRow(flags)
+				puts -nonewline $fileId " "
+				writeString $fileId $currentRow(parent)
+				puts $fileId ""
+			}
+			incr index
+		}
+		close $fileId
+	}
+}
+
+# Write a string, delineated by '"' and with '\' as the quote character.
+proc writeString {fileId toRecord} {
+	#debugLog "ws2 $fileId $toRecord"
+	puts -nonewline $fileId "\""
+	for {set i 0} {$i < [string length $toRecord]} {incr i} {
+		switch -exact -- [string range $toRecord $i $i] {
+			"\"" -
+			"\\" {
+				puts -nonewline $fileId "\\"
+				puts -nonewline $fileId [string range $toRecord $i $i]
+			}
+			default {
+				puts -nonewline $fileId [string range $toRecord $i $i]
+			}
+		}
+	}
+	puts -nonewline $fileId "\""
+}
+
+proc writeTopic {topicID topicContents} {
+	#debugLog "wt"
+	if { [catch {open "[getSnippetFilename $topicID]" w} fileId] } {
+		logMessage "Couldn't open file for writing.  Exiting from writeTopic..."
+		panic
+	} else {
+		set index 0
+		set shouldContinue 1
+		while {$shouldContinue} {
+			if {$index >= [llength $topicContents]} {
+				set shouldContinue 0
+			} else {
+				set current [lindex $topicContents $index]
+				writeString $fileId $current
+				puts $fileId ""
+			}
+			incr index
+		}
+		close $fileId
+	}
+}
+
+#
+# Script body
+#
+
+init
+if {[CGIQuery] != ""} {
+
+    pageStart
+
+    if {[CGIValue lookupMode] == "concordance"} {
+        puts "<h1>The Powered Access Bible:<br><em>Search Engine</em></h1>"
+        puts "<h2>The Holy Bible, [getBibleVersion]</h2>"
+        displayQueryForm
+        set sectionsToSearch {}
+        if {[CGIValue includeOldTestament] != ""} {
+            lappend sectionsToSearch "--old"
+        }
+        if {[CGIValue includeApocrypha] != ""} {
+            lappend sectionsToSearch "--apocrypha"
+        }
+        if {[CGIValue includeNewTestament] != ""} {
+            lappend sectionsToSearch "--new"
+        }
+        if {$sectionsToSearch == {}} {
+            set sectionsToSearch "--old --new"
+        }
+        switch -regexp [CGIValue lookup] {
+            {\w} {
+                set evalCommand "exec bin/concordance --cgi --version\
+                    [getBibleVersion] $sectionsToSearch --actionURL\
+                    [getActionURL] --first-book [CGIValue firstBook]\
+                    --last-book [CGIValue lastBook]"
+                if {[CGIValue matchPartialWords] != ""} {
+                    set evalCommand "$evalCommand --match-partial-words"
+                }
+                set evalCommand "$evalCommand [CGIValue lookup]"
+                set result [eval $evalCommand]
+                if {$result == ""} {
+                    puts -nonewline "<p><span class=\"heading\">Your search\
+                        didn't find any results.</span></p>"
+                } else {
+                    puts $result
+                }
+            }
+            default {
+            }
+        }
+        puts -nonewline "<p align=\"center\">This web tool was created by\
+            Jonathan Hayward (<a href=\"http://JonathansCorner.com\"\
+            target=\"top\">other creations</a>; <a\
+            href=\"mailto:jonathan.hayward@pobox.com\">e-mail</a>).</p>\n"
+        puts -nonewline "<p align=\"center\"><a\
+            href=\"[getDocumentURL]/tou.html\" target=\"_blank\">Terms of\
+            Use</a></p>"
+    } elseif  {[CGIValue lookupMode] == "passage"} {
+        puts "<h1>The Powered Access Bible:<br><em>Passage Lookup</em></h1>"
+        set reference [getCanonicalReference]
+        set reference [eval "exec bin/concordance --displayable-book-name\
+          $reference"]
+        if {[string length $reference] > 1} {
+            puts "<h2>$reference, [getBibleVersion]</h2>"
+        } else {
+            puts "<h2>The Holy Bible, [getBibleVersion]</h2>"
+        }
+        displayQueryForm
+        displayChapterNavigationIfAppropriate
+        if {[CGIValue highlightedWords] == ""} {
+            set result [exec "bin/passage" "--version" [getBibleVersion]\
+                "--silent" "--cgi" [getCanonicalReference]]
+        } else {
+            set highlightedWords [CGIValue highlightedWords]
+            regsub -all {\s+} $highlightedWords {_} highlightedWords
+            regsub -all {\++} $highlightedWords {_} highlightedWords
+            set result [eval "exec bin/passage --version [getBibleVersion]\
+                --silent --cgi --highlighted_words $highlightedWords\
+                [getCanonicalReference]"]
+        }
+        if {$result != ""} {
+            puts $result
+        } else {
+            switch -regexp [CGIValue lookup] {
+                {[\w]} {
+                    puts "<p>I'm sorry, but I couldn't find anything for that\
+                        reference. <strong>Try something like 'Deuteronomy\
+                        6:4-9' or 'I Corinthians 13'.</strong> You might use\
+                        the full name of the book, and making sure the chapter\
+                        and verses really exist. (You can't read Mark 17\
+                        because there <em>isn't</em> a Mark 17: Mark is only
+                        16 chapters long.)</p>"
+                }
+            }
+        }
+        displayChapterNavigationIfAppropriate
+        puts "<br>"
+        puts [exec "bin/concordance" "--version" [getBibleVersion] "--list-books"]
+        puts -nonewline "<p align=\"center\"><a\
+            href=\"[getDocumentURL]/tou.html\" target=\"_blank\">Terms of\
+            Use</a></p>"
+    } else {
+        displayQueryForm
+    }
+
+    pageEnd
+
+} else {
+    showFrames
+}

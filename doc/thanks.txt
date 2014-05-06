@@ -1,0 +1,26 @@
+
+The Powered Access Bible is (c) 2001-3 by Jonathan Hayward, released under
+the Artistic License, and comes with no warranty. Please visit my homepage at
+http://JonathansCorner.com to see what else I've created--not just software.
+
+I'd like to thank the following people for helping me debug or otherwise
+get this program in working order:
+
+    Waidelich Burkhard
+    Stuart Cassoff, who furnished the configuration file code
+    Bruce Hartweg
+    Jeff Hobbs
+    Cameron Laird
+    Mick O'Donnell
+    George Schlitz
+    Carl Sukkot, who provided invaluable suggestions
+
+Mike Doyle, for introducing me to Tcl and giving me several good Tcl
+books to start hacking with.
+
+and various other people from comp.lang.Tcl whose names I didn't get down.
+
+I'd like to thank the translators of the King James Version, the National
+Council of Churches for generously making the Revised Standard Version free for
+non-commercial use, and the makers of the Perl, Python, and Tcl tools I've been
+priveleged to use.

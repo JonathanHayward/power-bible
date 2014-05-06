@@ -1,0 +1,48 @@
+<!doctype html public "-//w3c//dtd html 4.0 transitional//en">
+<html>
+<head>
+<meta http-equiv="Content-Language" content="en-US">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Thank You for Using the Magic Notebook!</title>
+<style>
+<!--
+A.titlelink { text-decoration: none; font-size: larger; font-weight: bold }
+-->
+</style>
+</head>
+<!--
+Similar colors to the default, but mute the blue/purple/red somewhat.
+-->
+<body bgcolor="white" link="#2040B0" vlink="#A040B0" alink="#B04040"
+text="black" background="/Snapshot//background.jpg">
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+	<tr>
+		<td colspan="2" height="30">
+		</td>
+	</tr>
+	<tr>
+		<td width="80"> 
+			&nbsp;
+		</td>
+		<td>
+			<h1>Thank You for Using the Magic Notebook!</h1>
+
+			<p>If you're wondering where to go next, why not visit <a
+			href="http://JonathansCorner.com" target="_top">Jonathan's
+			Corner</a>? Whether you read the story of a medieval genius in 21st
+			century America, or a flowing sequence of dreamlike images, or a
+			collection of riddles, there is a thread of wonder running through
+			almost all of the creations there.  Why not visit, and see
+			if anything there interests you?</p>
+
+			<p><a href="http://JonathansCorner.com" target="_top">Jonathan
+			Hayward</a></p>
+
+			<p>(Or, <a href="http://inner-sanctum.jonathanscorner.com/cgi-bin/Snapshot">return to the Magic
+			Notebook</a>.)</p>
+
+		</td>
+	</tr>
+</table>
+</body>
+</html>

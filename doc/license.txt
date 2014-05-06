@@ -1,0 +1,31 @@
+All original material released with the Powered Access Bible, including all
+executable code, is (c) 2001-3 by Jonathan Hayward. It is released under the
+user's choice of the Artistic License (which should be available in the file
+artistic.txt in this directory, or on the web at
+http://www.perl.com/language/misc/Artistic.html) and the Free Software
+Foundation's General Public License (which should be available in the file
+gpl.txt in this directory or on the web at
+http://www.gnu.org/copyleft/gpl.html).
+
+The King James Version is in the public domain.
+
+The Revised Standard Version is used by the gracious permission of the National
+Council of Churches and is free for non-commercial use.:
+    
+
+
+        Source:
+            Transcribed from: The Holy Bible: Revised Standard Version
+            containing the Old and New Testaments, translated from the original
+            tongues: being the version set forth A.D. 1611, revised A.D.
+            1881-1885 and A.D. 1901: compared with the most ancient authorities
+            and revised A.D. 1946-52. -- 2nd ed. of New Testament A.D. 1971.
+            There should be enough in the rest of the description to identify
+            the text.
+
+        Language:
+            English
+
+        Availability:
+            Freely available for non-commercial use provided that this header
+            is included in its entirety with any copy distributed.

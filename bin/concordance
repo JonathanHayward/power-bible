@@ -1,0 +1,403 @@
+#!FULL_PERL_PATH
+
+$old_testament_books = " genesis exodus leviticus numbers deuteronomy joshua judges ruth i-samuel ii-samuel i-kings ii-kings i-chronicles ii-chronicles ezra nehemiah esther job psalms proverbs ecclesiastes song-of-songs isaiah jeremiah lamentations ezekiel daniel hosea joel amos obadiah jonah micah nahum habakkuk zephaniah haggai zechariah malachi ";
+$apocrypha_books = " i-esdras ii-esdras tobit judith additions-to-esther wisdom sirach baruch azariah suzanna bel-and-the-dragon prayer-of-manasseh i-maccabees ii-maccabees iii-maccabees iv-maccabees psalm-151 ";
+#$apocrypha_books = " additions-to-daniel judith esdras additions-to-esther susanna i-maccabees ii-maccabees ii-esdras prayer-of-manessah sirach wisdom baruch tobit bel ";
+$new_testament_books = " matthew mark luke john acts romans i-corinthians ii-corinthians galatians ephesians philippians colossians i-thessalonians ii-thessalonians i-timothy ii-timothy titus philemon hebrews james i-peter ii-peter i-john ii-john iii-john jude revelation ";
+
+$apocrypha_specified = 0;
+$sections_specified = 0;
+$first_book = "firstAvailableBook";
+$last_book = "lastAvailableBook";
+$version = "RSV";
+$new_testament_specified = 1;
+$old_testament_specified = 1;
+$should_adorn = 1;
+$all_available_books = " $old_testament_books $apocrypha_books $new_testament_books ";
+$all_available_books =~ s/ +/ /g;
+
+sub get_proper_book_name
+    {
+    my $unprocessed_book_name = shift(@_);
+    unless ($unprocessed_book_name =~ /[a-z]/)
+        {
+        return $unprocessed_book_name;
+        }
+    if ($unprocessed_book_name eq "additions-to-daniel")
+        {
+        return "Additions to Daniel";
+        }
+    elsif ($unprocessed_book_name eq "additions-to-esther")
+        {
+        return "Additions to Esther";
+        }
+    elsif ($unprocessed_book_name eq "bel-and-the-dragon")
+        {
+        return "Bel and the Dragon";
+        }
+    elsif ($unprocessed_book_name eq "prayer-of-manasseh")
+        {
+        return "Prayer of Manasseh";
+        }
+    elsif ($unprocessed_book_name eq "psalm-151")
+        {
+        return "Psalm 151";
+        }
+    elsif ($unprocessed_book_name eq "song-of-songs")
+        {
+        return "Song of Songs";
+        }
+    else
+        {
+        my @book_name_parts = split /-/, $unprocessed_book_name;
+        if (scalar @book_name_parts == 1)
+            {
+            my $book_name_proper = shift @book_name_parts;
+            #$book_name_proper =~ s/(\w+)/\u\L$1/;
+            $book_name_proper = "\u\L$book_name_proper";
+            return $book_name_proper;
+            }
+        elsif (scalar @book_name_parts == 2)
+            {
+            my $book_number = shift @book_name_parts;
+            if ($book_number =~ /^[Pp]/)
+                {
+                $book_number = "\u\L$book_number";
+                }
+            else
+                {
+                $book_number = uc($book_number);
+                }
+            my $book_name_proper = shift @book_name_parts;
+            #$book_name_proper =~ s/(\w+)/\u\L$1/;
+            $book_name_proper = "\u\L$book_name_proper";
+            return "$book_number $book_name_proper";
+            }
+        else
+            {
+            return $unprocessed_book_name
+            }
+        }
+    }
+
+sub get_url_encoded_book_name
+    {
+    my $working_book_name = shift( @_ );
+    $working_book_name = &get_proper_book_name( $working_book_name );
+    $working_book_name =~ s/ +/+/g;
+    return $working_book_name;
+    }
+
+sub give_usage
+    {
+    print "Usage:\n" .
+      "concordance [-o|--old] [-a|--apocrypha] [-n|--new] [-u|--unadorned]\n  <word or words>\n";
+    exit 1;
+    }
+
+sub list_books
+    {
+    print "<table align=\"center\" cellpadding=\"5\">";
+    print "<tr>";
+    print "<td align=\"left\"><span class=\"heading\">Old Testament</td>";
+    print "<td align=\"left\"><span class=\"heading\">Apocrypha</span></td>";
+    print "<td align=\"left\"><span class=\"heading\">New Testament</span></td>";
+    print "</tr><tr><td valign=\"top\">";
+    &list_column_of_books( $old_testament_books );
+    print "</td><td valign=\"top\">";
+    &list_column_of_books( $apocrypha_books );
+    print "</td><td valign=\"top\">";
+    &list_column_of_books( $new_testament_books );
+    print "</td></tr></table>";
+    }
+
+sub list_column_of_books
+    {
+    my $column_of_books = shift ( @_ );
+    foreach $book (split / +/, $column_of_books)
+        {
+        if ($book =~ /(.*)/)
+            {
+            $url_encoded_book_name = &get_url_encoded_book_name($1);
+            $book_name = &get_proper_book_name($1);
+            print "<a href=\"$action_URL?lookupMode=passage&lookup=$url_encoded_book_name+1&highlightedWords=$encoded_words&BibleVersion=$version\" target=\"passage\">$book_name</a><br>\n";
+            }
+        }
+    }
+
+sub output_book_choice
+    {
+    my $html_input_name = shift( @_ );
+    my $top_choice_name = shift ( @_ );
+    my $top_choice_text_to_display = shift ( @_ );
+    my $currently_selected = shift (@_ );
+    print "<select name=\"$html_input_name\">\n";
+    print "<option value=\"$top_choice_name\"";
+    if ($currently_selected eq $top_choice_name)
+        {
+        print " selected";
+        }
+    print ">$top_choice_text_to_display</option>\n";
+    foreach $current_book (split / /, $all_available_books)
+        {
+        if ($current_book ne "")
+            {
+            print "<option value=\"$current_book\"";
+            if ($currently_selected eq $current_book)
+                {
+                print " selected";
+                }
+            print ">" . &get_proper_book_name( $current_book ) . "</option>\n";
+            }
+        }
+    print "</select>\n";
+    }
+
+sub specify_first_section
+    {
+    $old_testament_specified = 0;
+    $apocrypha_specified = 0;
+    $new_testament_specified = 0;
+    $sections_specified = 1;
+    }
+
+@modified_argv = split / /, join " ", @ARGV;
+if (scalar @modified_argv == 0)
+    {
+    &give_usage;
+    }
+else
+    {
+    while (scalar @modified_argv > 0)
+        {
+        $current_argument = shift @modified_argv;
+        if ($current_argument eq "--actionURL")
+            {
+            $action_URL = shift @modified_argv;
+            }
+        elsif ($current_argument eq "-a" or $current_argument eq "--apocrypha")
+            {
+            if ($sections_specified)
+                {
+                $apocrypha_specified = 1;
+                }
+            else
+                {
+                &specify_first_section;
+                $apocrypha_specified = 1;
+                }
+            }
+        elsif ($current_argument eq "-c" or $current_argument eq "--cgi")
+            {
+            $cgi = 1;
+            }
+        elsif ($current_argument eq "-d" or $current_argument eq
+          "--displayable-book-name" or $current_argument eq
+          "--displayable_book_name")
+            {
+            print &get_proper_book_name(join " ", @modified_argv) . "\n";
+            exit 0;
+            }
+        elsif ($current_argument eq "--first-book" or $current_argument eq
+          "--first_book")
+            {
+            $first_book = shift @modified_argv;
+            if ($first_book eq "")
+                {
+                $first_book = "firstAvailableBook";
+                }
+            }
+        elsif ($current_argument eq "--last-book" or $current_argument eq
+          "--last_book")
+            {
+            $last_book = shift @modified_argv;
+            if ($last_book eq "")
+                {
+                $last_book = "lastAvailableBook";
+                }
+            }
+        elsif ($current_argument eq "-l" or $current_argument eq
+          "--list-books" or $current_argument eq "--list_books")
+            {
+            &list_books();
+            exit 0;
+            }
+        elsif ($current_argument eq "--match-partial-word" or
+          $current_argument eq "--match-partial-words" or
+          $current_argument eq "--match_partial_word" or
+          $current_argument eq "--match_partial_words")
+            {
+            $match_partial_words = 1;
+            }
+        elsif ($current_argument eq "-m" or $current_argument eq
+          "--menu_of_books")
+            {
+            $first_or_last = shift @modified_argv;
+            $currently_selected_book = shift @modified_argv;
+            if ($first_or_last eq "first")
+                {
+                &output_book_choice("firstBook", "firstAvailableBook",
+                  "Start search at...", $currently_selected_book);
+                }
+            else
+                {
+                &output_book_choice("lastBook", "lastAvailableBook",
+                  "End search at...", $currently_selected_book);
+                }
+            exit 0;
+            }
+        elsif ($current_argument eq "-n" or $current_argument eq "--new")
+            {
+            if ($sections_specified)
+                {
+                $new_testament_specified = 1;
+                }
+            else
+                {
+                &specify_first_section;
+                $new_testament_specified = 1;
+                }
+            }
+        elsif ($current_argument eq "-o" or $current_argument eq "--old")
+            {
+            if ($sections_specified)
+                {
+                $old_testament_specified = 1;
+                }
+            else
+                {
+                &specify_first_section;
+                $old_testament_specified = 1;
+                }
+            }
+        elsif ($current_argument eq "-u" or $current_argument eq "--unadorned")
+            {
+            $should_adorn = 0;
+            }
+        elsif ($current_argument eq "-v" or $current_argument eq "--version")
+            {
+            $version = shift @modified_argv;
+            }
+        else
+            {
+            @words = (@words, split / /, $current_argument);
+            }
+        }
+    }
+if ( (scalar @words ) == 0 )
+    {
+    &give_usage;
+    }
+
+$books = "";
+if ($old_testament_specified)
+    {
+    $books .= " $old_testament_books";
+    }
+if ($apocrypha_specified)
+    {
+    $books .= " $apocrypha_books";
+    }
+if ($new_testament_specified)
+    {
+    $books .= " $new_testament_books";
+    }
+$books .= " ";
+$final_selected_books = " ";
+$first_book_reached = 0;
+$last_book_reached = 0;
+foreach $book_in_range ("firstAvailableBook", (split / /,
+  $all_available_books), "lastAvailableBook")
+    {
+    if ($book_in_range ne "")
+        {
+        if ($book_in_range eq $first_book)
+            {
+            $first_book_reached = 1;
+            }
+        if ($first_book_reached and not $last_book_reached and
+          $books =~ / $book_in_range /)
+            {
+            $final_selected_books .= "$book_in_range ";
+            }
+        if ($book_in_range eq $last_book)
+            {
+            $last_book_reached = 1;
+            }
+        }
+    }
+$words = join " ", @words;
+chdir "versions/$version/";
+$first_word = $words[0];
+$grep_result = `grep -i $first_word $final_selected_books`;
+chomp $grep_result;
+@lines = split /\n/, $grep_result;
+foreach $current_word (@words)
+    {
+    @next_cut = ();
+    foreach $current_line (@lines)
+        {
+        if ($match_partial_words)
+            {
+            if ($current_line =~ /$current_word/i)
+                {
+                @next_cut = (@next_cut, $current_line);
+                }
+            }
+        else
+            {
+            if ($current_line =~ /\b$current_word\b/i)
+                {
+                @next_cut = (@next_cut, $current_line);
+                }
+            }
+        }
+    @lines = @next_cut;
+    }
+$encoded_words = join "+", @words;
+foreach $current_line (@lines)
+    {
+    if ($current_line =~ /([\w -]+):(\d+):(\d+):? (.*)/)
+        {
+        $book_name = &get_proper_book_name( $1 );
+        if ($should_adorn)
+            {
+            $verse = $4;
+            if ($cgi)
+                {
+                if ($action_URL ne "")
+                    {
+                    $url_encoded_book_name = &get_url_encoded_book_name ( $1 );
+                    print "<p><span class=\"heading\"><a href=\"$action_URL?lookupMode=passage&lookup=$url_encoded_book_name+$2&highlightedWords=$encoded_words&BibleVersion=$version#$2.$3\" target=\"passage\">$book_name $2:$3</a></span><br>\n";
+                    }
+                else
+                    {
+                    print "<p><span class=\"heading\">$book_name $2:$3</span><br>\n";
+                    }
+                foreach $current_word (@words)
+                    {
+                    $verse =~ s/$current_word/<span class=\"highlighted\">$current_word<\/span>/gi;
+                    }
+                print "$verse</p>\n";
+                }
+            else
+                {
+                print "[7m$book_name $2:$3[0m\n";
+                foreach $current_word (@words)
+                    {
+                    $verse =~ s/$current_word/[4m$current_word[0m/gi;
+                    }
+                print `echo "$verse" | fmt`;
+                print "\n";
+                }
+            }
+        else
+            {
+            print "`echo '$current_line' | fmt`\n";
+            }
+        }
+    else
+        {
+        print "`echo '$current_line' | fmt`\n";
+        }
+    }
